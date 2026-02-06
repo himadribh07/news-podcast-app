@@ -226,7 +226,12 @@ if st.button("Generate News Summary", type="primary"):
         state_info = ""
         if "All States" not in selected_states:
             state_list = ", ".join(selected_states)
-            state_info = f"\n\nFocus on news from these states: {state_list}. Prioritize these states in your reporting."
+            state_info = f"""
+            
+            ⚠️ PRIORITY: Focus primarily on news from these states: {state_list}
+            - Report news happening IN and affecting these states first
+            - Only include national/international news if directly relevant to these states
+            - Make state-specific news the main focus of your report"""
         else:
             state_info = "\n\nInclude news from across all Indian states and unions."
 
