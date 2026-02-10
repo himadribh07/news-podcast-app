@@ -23,18 +23,8 @@ st.set_page_config(page_title="News Audio Summary", layout="centered")
 st.title("📰 Last 24-Hour News Headlines Generator")
 st.write("Get Lastest India news, International news, and Sports.")
 
-# -----------------------------
-# 🔊 Voice Selection
-# -----------------------------
-# voice_choice = st.radio(
-#     "Select Voice Type:",
-#     ["Female", "Male"],
-#     index=0
-# )
 
-# -----------------------------
 # 🗂️ News Category Selection
-# -----------------------------
 all_genres = [
     "Front Page / Breaking News",
     "International News",
@@ -132,72 +122,31 @@ def clean_text_for_output(text: str) -> str:
 
 if st.button("Generate News Summary", type="primary"):
     with st.spinner("Fetching news summary..."):
-        # prompt = """
-        # Give me well-structured news updates. 
-        # Include ONLY information from the last 24 hours if you know it.
-
-        # Format the output EXACTLY like this:
-
-        # ## 🇮🇳 India News
-        # - headline 1
-        # - headline 2
-        # - headline 3
-
-        # ## 🌍 International News
-        # - headline 1
-        # - headline 2
-
-        # ## 🏆 Sports & Entertainment News
-
-        # ### Sports (all categories)
-        # Include headlines from:
-        # - Cricket
-        # - Football (EPL, La Liga, Serie A, Ligue 1, Bundesliga, Champions League, Europa League, ISL, etc.)
-        # - Any other major sports events
-
-        # Use bullet points:
-        # - headline 1
-        # - headline 2
-        # - headline 3
-
-        # ### Entertainment (India + global)
-        # Include headlines from:
-        # - Bollywood (India)
-        # - Hollywood (global)
-        # - Major film releases or celebrity updates
-
-        # Use bullet points:
-        # - headline 1
-        # - headline 2
-
-        # Keep it short, factual, and in clean bullet points.
-        # """
-
         genre_instructions = []
 
         if "Front Page / Breaking News" in selected_genres:
             genre_instructions.append("""
-            ## 🗞️ Front Page / Breaking News (India-focused)
+            ## Front Page / Breaking News (India-focused)
             - Include the most important national or global breaking stories from the last 24 hours
             - Government decisions, emergencies, major incidents
             """)
 
         if "Politics" in selected_genres:
             genre_instructions.append("""
-            ## 🏛️ Politics
+            ## Politics
             - Indian politics only
             - Government decisions, elections, policy changes, parliament updates
             """)
 
         if "Finance" in selected_genres:
             genre_instructions.append("""
-            ## 💰 Finance
+            ## Finance
             - Indian markets, RBI updates, inflation, startups, major corporate news
             """)
 
         if "Sports" in selected_genres:
             genre_instructions.append("""
-            ## 🏆 Sports
+            ## Sports
             - Cricket (India priority)
             - Football (major leagues only)
             - Any major international sports events
@@ -205,14 +154,14 @@ if st.button("Generate News Summary", type="primary"):
 
         if "Entertainment" in selected_genres:
             genre_instructions.append("""
-            ## 🎬 Entertainment
+            ## Entertainment
             - Bollywood first
             - Major Hollywood or global entertainment news
             """)
 
         if "Technology" in selected_genres:
             genre_instructions.append("""
-            ## 💻 Technology
+            ## Technology
             - Indian tech startups and companies
             - Major tech announcements, AI, cyber security
             - Innovation and digital transformation
@@ -220,7 +169,7 @@ if st.button("Generate News Summary", type="primary"):
 
         if "Health" in selected_genres:
             genre_instructions.append("""
-            ## 🏥 Health
+            ## Health
             - Health policy updates, disease prevention
             - Medical breakthroughs and research
             - Public health alerts and wellness news
