@@ -108,17 +108,21 @@ if not selected_states:
 
 def clean_text_for_output(text: str) -> str:
     """
-    Removes Markdown formatting for PDF and TTS usage.
+    Removes Markdown formatting and special characters for PDF and TTS usage.
     """
     # Remove Markdown headings (##, ###, etc.)
     text = re.sub(r"^#+\s*", "", text, flags=re.MULTILINE)
 
-    # Remove bold/italic markers (**text**, *text*)
+    # Remove bold/italic markers and asterisks (**text**, *text*, *)
     text = re.sub(r"\*\*(.*?)\*\*", r"\1", text)
     text = re.sub(r"\*(.*?)\*", r"\1", text)
+    text = re.sub(r"\*", "", text)  # Remove any remaining asterisks
 
     # Remove bullet markers like "- "
     text = re.sub(r"^\s*-\s*", "", text, flags=re.MULTILINE)
+
+    # Remove other special characters that might cause audio issues
+    text = re.sub(r"[#@&]", "", text)
 
     # Remove extra blank lines
     text = re.sub(r"\n{3,}", "\n\n", text)
