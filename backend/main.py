@@ -2,205 +2,195 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
-from google.genai import client
+# Only import the modern google-genai SDK
+from google import genai
+from google.genai import types
 from dotenv import load_dotenv
 from gtts import gTTS
 from datetime import datetime
+from pydantic import BaseModel
 import os
-import tempfile
 import re
 from typing import List, Optional
 
 load_dotenv()
-API_KEY = os.getenv("API_KEY")
+
+# .strip() prevents trailing spaces or newlines in the .env from breaking the key
+API_KEY = os.getenv("API_KEY", "").strip() 
 if not API_KEY:
     raise RuntimeError("API_KEY not set in environment")
 
-cl = client.Client(api_key=API_KEY)
+# Initialize the modern client
+client = genai.Client(api_key=API_KEY)
 
 app = FastAPI(title="News Podcast API")
 
-# Allow local frontend origin — adjust as needed
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:3000"],
+    allow_origins=[
+        "http://localhost:5173",
+        "http://localhost:3000",
+        "http://localhost:5174",
+        "http://127.0.0.1:5173",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# directory to store generated assets
 OUTPUT_DIR = os.path.join(os.path.dirname(__file__), "static")
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 app.mount("/static", StaticFiles(directory=OUTPUT_DIR), name="static")
 
 
+ALL_GENRES = [
+    "Front Page / Breaking News",
+    "International News",
+    "Politics",
+    "Finance",
+    "Sports",
+    "Entertainment",
+    "Technology",
+    "Health",
+]
+
+GENRE_BLOCKS = {
+    "Front Page / Breaking News": """
+    ## Front Page / Breaking News (India-focused)
+    - Include the most important national or global breaking stories from the last 24 hours
+    - Government decisions, emergencies, major incidents
+    """,
+    "International News": """
+    ## International News
+    - Major global events, geopolitics, conflicts, diplomacy
+    - Focus on stories with India relevance when possible
+    """,
+    "Politics": """
+    ## Politics
+    - Indian politics only
+    - Government decisions, elections, policy changes, parliament updates
+    """,
+    "Finance": """
+    ## Finance
+    - Indian markets, RBI updates, inflation, startups, major corporate news
+    """,
+    "Sports": """
+    ## Sports
+    - Cricket (India priority)
+    - Football (major leagues only)
+    - Any major international sports events
+    """,
+    "Entertainment": """
+    ## Entertainment
+    - Bollywood first
+    - Major Hollywood or global entertainment news
+    """,
+    "Technology": """
+    ## Technology
+    - Indian tech startups and companies
+    - Major tech announcements, AI, cyber security
+    - Innovation and digital transformation
+    """,
+    "Health": """
+    ## Health
+    - Health policy updates, disease prevention
+    - Medical breakthroughs and research
+    - Public health alerts and wellness news
+    """,
+}
+
+
+class GenerateRequest(BaseModel):
+    genres: Optional[List[str]] = None
+    states: Optional[List[str]] = None
+
+
 def clean_text_for_output(text: str) -> str:
-    """
-    Removes Markdown formatting and special characters for TTS usage.
-    """
+    """Strip Markdown for TTS."""
     text = re.sub(r"^#+\s*", "", text, flags=re.MULTILINE)
     text = re.sub(r"\*\*(.*?)\*\*", r"\1", text)
     text = re.sub(r"\*(.*?)\*", r"\1", text)
     text = re.sub(r"\*", "", text)
-    text = re.sub(r"^\s*-\s*", "", text, flags=re.MULTILINE)
-    text = re.sub(r"[#@&]", "", text)
+    text = re.sub(r"^\s*[-•]\s*", "", text, flags=re.MULTILINE)
+    text = re.sub(r"[#@&`]", "", text)
     text = re.sub(r"\n{3,}", "\n\n", text)
     return text.strip()
 
 
-@app.post("/generate")
-async def generate_episode(
-    genres: Optional[List[str]] = None,
-    states: Optional[List[str]] = None,
-    include_pdf: bool = False,
-):
-    """
-    Generate a short news audio summary based on optional genres and states.
-    Returns JSON with `audio_url` (served under /static) and optional `pdf_url`.
-    """
-    # default genre list
-    all_genres = [
-        "Front Page / Breaking News",
-        "International News",
-        "Politics",
-        "Finance",
-        "Sports",
-        "Entertainment",
-        "Technology",
-        "Health",
-    ]
+def build_prompt(genres: List[str], states: List[str]) -> str:
+    genre_instructions = "".join(GENRE_BLOCKS[g] for g in genres if g in GENRE_BLOCKS)
 
-    if not genres:
-        selected_genres = all_genres
+    if "All States" in states or not states:
+        state_info = "Include news from across all Indian states and union territories."
     else:
-        if "ALL" in genres:
-            selected_genres = all_genres
-        else:
-            selected_genres = [g for g in genres if g in all_genres]
+        state_info = f"PRIORITY: Focus on these states: {', '.join(states)}."
 
-    selected_states = states or ["All States"]
-
-    # Build prompt
-    genre_instructions = []
-    if "Front Page / Breaking News" in selected_genres:
-        genre_instructions.append(
-            """
-            ## Front Page / Breaking News (India-focused)
-            - Include the most important national or global breaking stories from the last 24 hours
-            - Government decisions, emergencies, major incidents
-            """
-        )
-    if "Politics" in selected_genres:
-        genre_instructions.append(
-            """
-            ## Politics
-            - Indian politics only
-            - Government decisions, elections, policy changes, parliament updates
-            """
-        )
-    if "Finance" in selected_genres:
-        genre_instructions.append(
-            """
-            ## Finance
-            - Indian markets, RBI updates, inflation, startups, major corporate news
-            """
-        )
-    if "Sports" in selected_genres:
-        genre_instructions.append(
-            """
-            ## Sports
-            - Cricket (India priority)
-            - Football (major leagues only)
-            - Any major international sports events
-            """
-        )
-    if "Entertainment" in selected_genres:
-        genre_instructions.append(
-            """
-            ## Entertainment
-            - Bollywood first
-            - Major Hollywood or global entertainment news
-            """
-        )
-    if "Technology" in selected_genres:
-        genre_instructions.append(
-            """
-            ## Technology
-            - Indian tech startups and companies
-            - Major tech announcements, AI, cyber security
-            - Innovation and digital transformation
-            """
-        )
-    if "Health" in selected_genres:
-        genre_instructions.append(
-            """
-            ## Health
-            - Health policy updates, disease prevention
-            - Medical breakthroughs and research
-            - Public health alerts and wellness news
-            """
-        )
-
-    if "All States" not in selected_states:
-        state_list = ", ".join(selected_states)
-        state_info = f"PRIORITY: Focus on these states: {state_list}."
-    else:
-        state_info = "Include news from across all Indian states and unions."
-
-    prompt = f"""
+    return f"""
     You are a professional news editor.
 
     Give me factual, concise news items from the last 24 hours only.
 
     Formatting rules (STRICT):
     - Use bullet points only
-    - Each bullet must be:
-    - **Headline** — one-line factual detail
+    - Each bullet must be: **Headline** — one-line factual detail
     - One-line detail must explain what happened or why it matters
-    - Max 20–25 words per detail
+    - Max 20-25 words per detail
     - No opinions, no speculation, no repetition
     - Clean, neutral tone suitable for audio narration
 
-    {''.join(genre_instructions)}
+    {genre_instructions}
     {state_info}
     """
 
+
+@app.post("/generate")
+async def generate_episode(req: GenerateRequest):
+    """Generate news audio. Returns audio_url under /static."""
+    if not req.genres or "ALL" in req.genres:
+        selected_genres = ALL_GENRES
+    else:
+        selected_genres = [g for g in req.genres if g in ALL_GENRES]
+        if not selected_genres:
+            selected_genres = ALL_GENRES
+
+    selected_states = req.states or ["All States"]
+    prompt = build_prompt(selected_genres, selected_states)
+
     try:
-        interaction = cl.interactions.create(
+        # Correctly calling the model using the modern SDK
+        resp = client.models.generate_content(
             model="gemini-2.5-flash",
-            input=prompt,
-            tools=[{"type": "google_search"}],
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                tools=[{"google_search": {}}] # Correct syntax for search retrieval
+            )
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Model request failed: {e}")
 
-    text_output = next((o for o in interaction.outputs if o.type == "text"), None)
-    if not text_output:
-        raise HTTPException(status_code=500, detail="No text output from model")
+    raw_news_text = (resp.text or "").strip()
+    if not raw_news_text:
+        raise HTTPException(status_code=500, detail="Empty response from model")
 
-    raw_news_text = text_output.text
     clean_news_text = clean_text_for_output(raw_news_text)
 
-    # create audio
-    audio_filename = f"news_{datetime.utcnow().strftime('%Y%m%dT%H%M%SZ')}.mp3"
+    timestamp = datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
+    audio_filename = f"news_{timestamp}.mp3"
     audio_path = os.path.join(OUTPUT_DIR, audio_filename)
+
     try:
-        tts = gTTS(clean_news_text)
+        tts = gTTS(clean_news_text, lang="en", tld="co.in")
         tts.save(audio_path)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"TTS failed: {e}")
 
-    result = {"audio_url": f"/static/{audio_filename}", "date": datetime.utcnow().isoformat()}
-
-    # Optionally create PDF (not implemented fully here)
-    if include_pdf:
-        pdf_filename = f"news_{datetime.utcnow().strftime('%Y%m%dT%H%M%SZ')}.pdf"
-        pdf_path = os.path.join(OUTPUT_DIR, pdf_filename)
-        # Minimal PDF generation could be added here if needed.
-        result["pdf_url"] = f"/static/{pdf_filename}"
-
-    return JSONResponse(result)
+    return JSONResponse({
+        "audio_url": f"/static/{audio_filename}",
+        "date": datetime.utcnow().isoformat(),
+        "genres": selected_genres,
+        "states": selected_states,
+        "script": clean_news_text,
+    })
 
 
 @app.get("/health")
