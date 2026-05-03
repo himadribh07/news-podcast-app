@@ -61,7 +61,7 @@ export default function FeaturedEpisode({
       // Need to fetch audio first
       setIsLoading(true);
       try {
-        const res = await fetch('http://localhost:8000/generate', {
+        const res = await fetch('https://news-podcast-app.onrender.com/generate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ genres: null, states: null }),
@@ -72,7 +72,7 @@ export default function FeaturedEpisode({
           return;
         }
         const json = await res.json();
-        const audioRes = await fetch(`http://localhost:8000${json.audio_url}`);
+        const audioRes = await fetch(`https://news-podcast-app.onrender.com${json.audio_url}`);
         if (!audioRes.ok) {
           console.error('Failed to fetch audio', await audioRes.text());
           setIsLoading(false);
@@ -105,7 +105,7 @@ export default function FeaturedEpisode({
     setTranscriptLoading(true);
     try {
       const dateStr = getFormattedDate();
-      const res = await fetch(`http://localhost:8000/transcript/${dateStr}`);
+      const res = await fetch(`https://news-podcast-app.onrender.com/transcript/${dateStr}`);
       if (!res.ok) {
         console.error('Failed to fetch transcript');
         setTranscriptLoading(false);

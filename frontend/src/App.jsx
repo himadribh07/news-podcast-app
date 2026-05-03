@@ -16,7 +16,7 @@ function AppInner() {
   useEffect(() => {
     (async () => {
       try {
-        const res = await fetch('http://localhost:8000/generate', {
+        const res = await fetch('https://news-podcast-app.onrender.com/generate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({}),
@@ -29,7 +29,7 @@ function AppInner() {
         console.log('API totalTime:', json.totalTime);
 
         setTotalTime(json.totalTime ?? '--:--');
-        setAudioSource(`http://localhost:8000${json.audio_url}`);
+        setAudioSource(`https://news-podcast-app.onrender.com${json.audio_url}`);
       } catch (err) {
         console.error(err);
       }

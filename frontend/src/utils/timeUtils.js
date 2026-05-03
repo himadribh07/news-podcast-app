@@ -81,7 +81,7 @@ export const convertToMinFormat = (timeString) => {
  */
 export const getEpisodeNumber = async () => {
   try {
-    const res = await fetch('http://localhost:8000/episode-count');
+    const res = await fetch('https://news-podcast-app.onrender.com/episode-count');
     if (!res.ok) throw new Error('Failed to fetch episode count');
     const data = await res.json();
     return data.totalEpisodes || 1;
