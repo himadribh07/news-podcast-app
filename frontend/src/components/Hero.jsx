@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useContext, useState } from 'react';
 import { formatEyebrowDate } from '../utils/formatDate';
+import { AudioContext } from '../context/AudioContext';
 
 export default function Hero({
   eyebrowDate,
@@ -14,15 +15,47 @@ export default function Hero({
   onPrimary,
   onSecondary,
 }) {
+  const audio = useContext(AudioContext);
+  const [isLoading, setIsLoading] = useState(false);
   const displayEyebrowDate = eyebrowDate ?? formatEyebrowDate();
+
+  const handlePlayClick = async () => {
+    if (audio.playing) {
+      audio.togglePlayPause();
+    } else if (audio.audioRef.current?.src) {
+      audio.play();
+    } else {
+      // Need to fetch audio first
+      setIsLoading(true);
+      try {
+        const res = await fetch('https://news-podcast-app.onrender.com/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({}),
+        });
+        if (!res.ok) {
+          console.error('Generate failed', await res.text());
+          setIsLoading(false);
+          return;
+        }
+        const json = await res.json();
+        console.log('API totalTime:', json.totalTime);
+
+        audio.setAudioSource(`https://news-podcast-app.onrender.com${json.audio_url}`);
+        audio.setTotalTime(json.totalTime ?? '--:--');
+        audio.play();
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+  };
 
   // derive pill duration ("18 min") from totalTime ("18:04")
   const eyebrowDuration = totalTime
     ? `${parseInt(totalTime.split(':')[0], 10)} min`
     : '-- min';
-
-  // primary button label
-  const primaryLabel = `Play today's episode · ${totalTime ?? '--:--'}`;
 
   const defaultHeadline = (
     <>The news you need, <span className="sig-it">without</span> the noise you don't.</>
@@ -52,11 +85,11 @@ export default function Hero({
         <p className="sig-hero__sub">{sub}</p>
 
         <div className="sig-hero__ctas">
-          <button className="sig-btn sig-btn--accent" onClick={onPrimary}>
+          <button className="sig-btn sig-btn--accent" onClick={handlePlayClick} disabled={isLoading}>
             <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor">
-              {playing ? <path d="M6 4h4v16H6zM14 4h4v16h-4z" /> : <path d="M8 5v14l11-7z" />}
+              {isLoading ? <path d="M12 4v16M12 4v16" /> : playing ? <path d="M6 4h4v16H6zM14 4h4v16h-4z" /> : <path d="M8 5v14l11-7z" />}
             </svg>
-            {playing ? `Pause · ${totalTime ?? '--:--'}` : `Play today's episode · ${totalTime ?? '--:--'}`}
+            {isLoading ? 'Loading...' : playing ? `Pause · ${totalTime ?? '--:--'}` : `Play today's episode · ${totalTime ?? '--:--'}`}
           </button>
           <button className="sig-btn" onClick={onSecondary}>
             {secondaryLabel}
