@@ -285,6 +285,23 @@ async def health():
     return {"status": "ok"}
 
 
+@app.get("/episode-count")
+async def get_episode_count():
+    """Get total number of episodes produced by counting transcript files."""
+    try:
+        if not os.path.exists(TRANSCRIPTS_DIR):
+            return {"totalEpisodes": 0}
+        
+        # Count all transcript files (format: "3rd_May_file.json")
+        transcript_files = [f for f in os.listdir(TRANSCRIPTS_DIR) if f.endswith("_file.json")]
+        total_episodes = len(transcript_files)
+        
+        return {"totalEpisodes": total_episodes}
+    except Exception as e:
+        print(f"Error counting episodes: {e}")
+        return {"totalEpisodes": 1}  # Default to 1 if error
+
+
 @app.get("/transcript/{date_str}")
 async def get_transcript(date_str: str):
     """Get transcript by date string (e.g., '3rd_May')."""

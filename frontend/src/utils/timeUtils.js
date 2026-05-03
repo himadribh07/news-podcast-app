@@ -73,3 +73,29 @@ export const convertToMinFormat = (timeString) => {
   
   return `${minutes} MIN`;
 };
+
+/**
+ * Calculate episode number based on total episodes produced
+ * Fetches from backend API which counts existing episode files
+ * @returns {Promise<number>} Episode number (total episodes produced)
+ */
+export const getEpisodeNumber = async () => {
+  try {
+    const res = await fetch('http://localhost:8000/episode-count');
+    if (!res.ok) throw new Error('Failed to fetch episode count');
+    const data = await res.json();
+    return data.totalEpisodes || 1;
+  } catch (err) {
+    console.warn('Could not fetch episode count, defaulting to 1:', err);
+    return 1;
+  }
+};
+
+/**
+ * Get episode eyebrow text with dynamic episode number
+ * @returns {Promise<string>} Eyebrow text like "◇ Featured · Episode 5"
+ */
+export const getEpisodeEyebrow = async () => {
+  const episodeNum = await getEpisodeNumber();
+  return `◇ Featured · Episode ${episodeNum}`;
+};

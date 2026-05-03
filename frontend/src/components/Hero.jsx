@@ -4,12 +4,12 @@ import { formatEyebrowDate } from '../utils/formatDate';
 export default function Hero({
   eyebrowDate,
   totalTime,   
-  playing = false,                 // NEW: "MM:SS" from API
+  playing = false,                 //"MM:SS" from API
   live = true,
   headline,
   thesisTag = '[thesis]',
-  thesisText = 'seven stories. one host. eighteen minutes. before your coffee cools.',
-  sub = 'Signal is a daily news podcast for people who want to stay informed without drowning. Every morning we pick seven stories that matter, explain them in plain language, and skip the rest.',
+  thesisText = 'top stories. one host. under ten minutes. before your coffee cools.',
+  sub = 'Signal is a daily news for people who want to stay informed without drowning. Every morning we pick stories that matter, explain them in plain language, and skip the rest.',
   secondaryLabel = 'Browse the archive',
   onPrimary,
   onSecondary,

@@ -1,6 +1,6 @@
-import React, { useMemo, useState, useContext } from 'react';
+import React, { useMemo, useState, useContext, useEffect } from 'react';
 import { formatReleasedAt } from '../utils/formatDate';
-import { formatTimeDisplay, getFormattedDate, transcriptFormattedDate, calculateProgress, convertToMinFormat } from '../utils/timeUtils';
+import { formatTimeDisplay, getFormattedDate, transcriptFormattedDate, calculateProgress, convertToMinFormat, getEpisodeNumber, getEpisodeEyebrow } from '../utils/timeUtils';
 import { AudioContext } from '../context/AudioContext';
 /**
  * Big "today's episode" hero card with placeholder cover art + waveform.
@@ -17,8 +17,8 @@ import { AudioContext } from '../context/AudioContext';
  *   description    string         episode description
  */
 export default function FeaturedEpisode({
-  epNumber    = 412,
-  eyebrow     = '◇ Featured · Episode 412',
+  epNumber: propEpisodeNumber,
+  eyebrow: propEyebrow,
   sectionTitle,
   releasedAt,
   isNew       = true,
@@ -31,6 +31,18 @@ export default function FeaturedEpisode({
   const [transcript, setTranscript] = useState(null);
   const [showTranscript, setShowTranscript] = useState(false);
   const [transcriptLoading, setTranscriptLoading] = useState(false);
+  const [epNumber, setEpNumber] = useState(1);
+  const [eyebrow, setEyebrow] = useState('◇ Featured · Episode 1');
+
+  // Fetch episode number from backend on mount
+  useEffect(() => {
+    (async () => {
+      const episodeNum = await getEpisodeNumber();
+      const eyebrowText = await getEpisodeEyebrow();
+      setEpNumber(episodeNum);
+      setEyebrow(eyebrowText);
+    })();
+  }, []);
 
   const displayReleasedAt = releasedAt ?? formatReleasedAt();
   const displayTotalTime = audio.totalTime ?? '--:--';
