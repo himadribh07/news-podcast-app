@@ -1,47 +1,32 @@
 import React from 'react';
+import { formatEyebrowDate } from '../utils/formatDate';
 
-/**
- * Hero section.
- *
- * Props:
- *   eyebrowDate     string   small date pill text
- *   eyebrowDuration string   small duration pill text
- *   live            bool     show pulsing "Live" pill
- *   headline        node     the big H1 — wrap any words you want italic
- *                            in <span className="sig-it">…</span>
- *   thesisTag       string   short bracket tag, e.g. "[thesis]"
- *   thesisText      string   one-liner shown next to the tag
- *   sub             string   paragraph under the headline
- *   primaryLabel    string   primary CTA label
- *   secondaryLabel  string   secondary CTA label
- *   onPrimary, onSecondary   click handlers
- */
 export default function Hero({
   eyebrowDate,
-  eyebrowDuration = '18 min',
-  live            = true,
+  totalTime,   
+  playing = false,                 // NEW: "MM:SS" from API
+  live = true,
   headline,
-  thesisTag       = '[thesis]',
-  thesisText      = "seven stories. one host. eighteen minutes. before your coffee cools.",
-  sub             = "Signal is a daily news podcast for people who want to stay informed without drowning. Every morning we pick seven stories that matter, explain them in plain language, and skip the rest.",
-  primaryLabel    = "Play today's episode · 18:04",
-  secondaryLabel  = 'Browse the archive',
+  thesisTag = '[thesis]',
+  thesisText = 'seven stories. one host. eighteen minutes. before your coffee cools.',
+  sub = 'Signal is a daily news podcast for people who want to stay informed without drowning. Every morning we pick seven stories that matter, explain them in plain language, and skip the rest.',
+  secondaryLabel = 'Browse the archive',
   onPrimary,
   onSecondary,
 }) {
+  const displayEyebrowDate = eyebrowDate ?? formatEyebrowDate();
+
+  // derive pill duration ("18 min") from totalTime ("18:04")
+  const eyebrowDuration = totalTime
+    ? `${parseInt(totalTime.split(':')[0], 10)} min`
+    : '-- min';
+
+  // primary button label
+  const primaryLabel = `Play today's episode · ${totalTime ?? '--:--'}`;
+
   const defaultHeadline = (
     <>The news you need, <span className="sig-it">without</span> the noise you don't.</>
   );
-
-  const formatEyebrowDate = (d) => {
-    const mm = String(d.getMonth() + 1).padStart(2, '0');
-    const dd = String(d.getDate()).padStart(2, '0');
-    const yyyy = d.getFullYear();
-    const weekday = d.toLocaleDateString(undefined, { weekday: 'long' });
-    return `${mm} · ${dd} · ${yyyy} — ${weekday}`;
-  };
-
-  const displayEyebrowDate = eyebrowDate ?? formatEyebrowDate(new Date());
 
   return (
     <section className="sig-hero">
@@ -69,9 +54,9 @@ export default function Hero({
         <div className="sig-hero__ctas">
           <button className="sig-btn sig-btn--accent" onClick={onPrimary}>
             <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M8 5v14l11-7z" />
+              {playing ? <path d="M6 4h4v16H6zM14 4h4v16h-4z" /> : <path d="M8 5v14l11-7z" />}
             </svg>
-            {primaryLabel}
+            {playing ? `Pause · ${totalTime ?? '--:--'}` : `Play today's episode · ${totalTime ?? '--:--'}`}
           </button>
           <button className="sig-btn" onClick={onSecondary}>
             {secondaryLabel}
@@ -81,6 +66,7 @@ export default function Hero({
       </div>
 
       <style>{`
+        /* same as before — unchanged */
         .sig-hero { padding: 96px 0 120px; position: relative; }
         .sig-hero::before {
           content: ""; position: absolute;
@@ -88,19 +74,13 @@ export default function Hero({
           background: radial-gradient(circle, oklch(0.78 0.14 65 / 0.08), transparent 60%);
           pointer-events: none;
         }
-        .sig-hero__pills {
-          display: flex; gap: 10px; align-items: center;
-          margin-bottom: 40px; flex-wrap: wrap;
-        }
+        .sig-hero__pills { display: flex; gap: 10px; align-items: center; margin-bottom: 40px; flex-wrap: wrap; }
         .sig-hero__headline {
           font-family: var(--sans);
           font-size: clamp(48px, 7.4vw, 104px);
-          line-height: 0.98;
-          letter-spacing: -0.035em;
-          font-weight: 500;
-          margin: 0 0 36px;
-          max-width: 1000px;
-          text-wrap: balance;
+          line-height: 0.98; letter-spacing: -0.035em;
+          font-weight: 500; margin: 0 0 36px;
+          max-width: 1000px; text-wrap: balance;
         }
         .sig-hero__thesis {
           display: flex; gap: 14px; align-items: baseline;

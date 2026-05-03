@@ -15,7 +15,7 @@ export default function Footer({
   about = 'An independent daily news podcast. Seven stories, one host, eighteen minutes. Published every weekday at 6am Eastern.',
   columns = DEFAULT_COLUMNS,
   copyright = '© 2026 SIGNAL MEDIA CO.',
-  tagline   = 'MADE DAILY · BROOKLYN / LAGOS',
+  tagline   = 'MADE DAILY · INDIA',
   brandName,
   brandTag,
 }) {

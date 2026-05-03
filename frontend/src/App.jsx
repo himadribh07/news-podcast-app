@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useEffect, useContext } from 'react';
+import { AudioProvider, AudioContext } from './context/AudioContext';
 import './App.css';
 
 import Nav              from './components/Nav';
@@ -6,59 +7,59 @@ import Hero             from './components/Hero';
 import Ticker           from './components/Ticker';
 import FeaturedEpisode  from './components/FeaturedEpisode';
 import EpisodeList      from './components/EpisodeList';
-import TopicsGrid       from './components/TopicsGrid';
-import Hosts            from './components/Hosts';
 import Subscribe        from './components/Subscribe';
 import Footer           from './components/Footer';
 
-/**
- * Demo composition — drop these components anywhere in your app.
- * The whole tree must live inside an element with className="sig"
- * so the design tokens (--bg, --fg, --accent, etc.) apply.
- */
-export default function App() {
-  const handlePlay = (ep) => {
-    console.log('play', ep);
-    // Fetch generated audio from backend and play it
+function AppInner() {
+  const { playing, totalTime, setTotalTime, setAudioSource, togglePlayPause } = useContext(AudioContext);
+
+  useEffect(() => {
     (async () => {
       try {
-        const res = await fetch('http://localhost:8000/generate', { method: 'POST' });
+        const res = await fetch('http://localhost:8000/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({}),
+        });
         if (!res.ok) {
-          console.error('Generate request failed', await res.text());
+          console.error('Generate failed', await res.text());
           return;
         }
         const json = await res.json();
-        const audioRes = await fetch(`http://localhost:8000${json.audio_url}`);
-        if (!audioRes.ok) {
-          console.error('Failed to fetch audio', await audioRes.text());
-          return;
-        }
-        const blob = await audioRes.blob();
-        const url = URL.createObjectURL(blob);
-        const audio = new Audio(url);
-        await audio.play();
+        console.log('API totalTime:', json.totalTime);
+
+        setTotalTime(json.totalTime ?? '--:--');
+        setAudioSource(`http://localhost:8000${json.audio_url}`);
       } catch (err) {
         console.error(err);
       }
     })();
-  };
+  }, [setAudioSource, setTotalTime]);
 
   return (
     <div className="sig">
-      <Nav
-        onSubscribe={() => console.log('subscribe')}
-        onListenNow={handlePlay}
-      />
+      <Nav onSubscribe={() => console.log('subscribe')} onListenNow={togglePlayPause} />
       <main>
-        <Hero onPrimary={handlePlay} onSecondary={() => console.log('archive')} />
+        <Hero
+          totalTime={totalTime}
+          playing={playing}
+          onPrimary={togglePlayPause}
+          onSecondary={() => console.log('archive')}
+        />
         <Ticker />
-        <FeaturedEpisode onPlay={handlePlay} />
-        <EpisodeList onPlay={handlePlay} onViewAll={() => console.log('all')} />
-        {/* <TopicsGrid onSelect={(t) => console.log('topic', t)} /> */}
-        <Hosts />
+        <FeaturedEpisode />
+        <EpisodeList onPlay={togglePlayPause} onViewAll={() => console.log('all')} />
         <Subscribe onSelect={(p) => console.log('platform', p)} />
       </main>
       <Footer />
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <AudioProvider>
+      <AppInner />
+    </AudioProvider>
   );
 }

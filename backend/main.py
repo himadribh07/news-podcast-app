@@ -1,3 +1,6 @@
+import os
+import re
+import json
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
@@ -7,11 +10,11 @@ from google import genai
 from google.genai import types
 from dotenv import load_dotenv
 from gtts import gTTS
+from pydub.utils import mediainfo
 from datetime import datetime
 from pydantic import BaseModel
-import os
-import re
 from typing import List, Optional
+from mutagen.mp3 import MP3
 
 load_dotenv()
 
@@ -40,6 +43,8 @@ app.add_middleware(
 
 OUTPUT_DIR = os.path.join(os.path.dirname(__file__), "static")
 os.makedirs(OUTPUT_DIR, exist_ok=True)
+TRANSCRIPTS_DIR = os.path.join(os.path.dirname(__file__), "transcripts")
+os.makedirs(TRANSCRIPTS_DIR, exist_ok=True)
 app.mount("/static", StaticFiles(directory=OUTPUT_DIR), name="static")
 
 
@@ -117,6 +122,60 @@ def clean_text_for_output(text: str) -> str:
     return text.strip()
 
 
+
+def get_audio_duration(audio_path: str) -> str:
+    try:
+        audio = MP3(audio_path)
+        duration_seconds = audio.info.length
+        if duration_seconds == 0:
+            return "--:--"
+        minutes = int(duration_seconds // 60)
+        seconds = int(duration_seconds % 60)
+        return f"{minutes:02d}:{seconds:02d}"
+    except Exception as e:
+        print(f"Failed to get audio duration: {e}")
+        return "--:--"
+
+
+def get_date_formatted() -> str:
+    """Return date in format like '3rd_May' or '21st_June'."""
+    now = datetime.now()
+    day = now.day
+    month = now.strftime("%B")
+    
+    # Add suffix to day (st, nd, rd, th)
+    if 10 <= day % 100 <= 20:
+        suffix = "th"
+    else:
+        suffix = {1: "st", 2: "nd", 3: "rd"}.get(day % 10, "th")
+    
+    return f"{day}{suffix}_{month}"
+
+
+def check_existing_audio():
+    """Check if audio for today already exists."""
+    date_str = get_date_formatted()
+    audio_file = f"{date_str}_audio.mp3"
+    transcript_file = f"{date_str}_file.json"
+    audio_path = os.path.join(OUTPUT_DIR, audio_file)
+    transcript_path = os.path.join(TRANSCRIPTS_DIR, transcript_file)
+    
+    if os.path.exists(audio_path) and os.path.exists(transcript_path):
+        with open(transcript_path, 'r') as f:
+            transcript_data = json.load(f)
+        return {
+            "audio_url": f"/static/{audio_file}",
+            "transcript_url": f"/transcript/{date_str}",
+            "date": transcript_data.get("date"),
+            "genres": transcript_data.get("genres"),
+            "states": transcript_data.get("states"),
+            "script": transcript_data.get("script"),
+            "totalTime": transcript_data.get("totalTime"),
+            "cached": True,
+        }
+    return None
+
+
 def build_prompt(genres: List[str], states: List[str]) -> str:
     genre_instructions = "".join(GENRE_BLOCKS[g] for g in genres if g in GENRE_BLOCKS)
 
@@ -146,6 +205,11 @@ def build_prompt(genres: List[str], states: List[str]) -> str:
 @app.post("/generate")
 async def generate_episode(req: GenerateRequest):
     """Generate news audio. Returns audio_url under /static."""
+    # Check if audio for today already exists
+    existing = check_existing_audio()
+    if existing:
+        return JSONResponse(existing)
+    
     if not req.genres or "ALL" in req.genres:
         selected_genres = ALL_GENRES
     else:
@@ -174,9 +238,12 @@ async def generate_episode(req: GenerateRequest):
 
     clean_news_text = clean_text_for_output(raw_news_text)
 
-    timestamp = datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
-    audio_filename = f"news_{timestamp}.mp3"
+    # Use date-based filename
+    date_str = get_date_formatted()
+    audio_filename = f"{date_str}_audio.mp3"
+    transcript_filename = f"{date_str}_file.json"
     audio_path = os.path.join(OUTPUT_DIR, audio_filename)
+    transcript_path = os.path.join(TRANSCRIPTS_DIR, transcript_filename)
 
     try:
         tts = gTTS(clean_news_text, lang="en", tld="co.in")
@@ -184,18 +251,55 @@ async def generate_episode(req: GenerateRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"TTS failed: {e}")
 
-    return JSONResponse({
-        "audio_url": f"/static/{audio_filename}",
+    # Get audio duration
+    total_time = get_audio_duration(audio_path)
+
+    # Save transcript as JSON
+    transcript_data = {
         "date": datetime.utcnow().isoformat(),
         "genres": selected_genres,
         "states": selected_states,
         "script": clean_news_text,
+        "totalTime": total_time,
+    }
+    try:
+        with open(transcript_path, 'w') as f:
+            json.dump(transcript_data, f, indent=2)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to save transcript: {e}")
+
+    return JSONResponse({
+        "audio_url": f"/static/{audio_filename}",
+        "transcript_url": f"/transcript/{date_str}",
+        "date": transcript_data["date"],
+        "genres": selected_genres,
+        "states": selected_states,
+        "script": clean_news_text,
+        "totalTime": total_time,
+        "cached": False,
     })
 
 
 @app.get("/health")
 async def health():
     return {"status": "ok"}
+
+
+@app.get("/transcript/{date_str}")
+async def get_transcript(date_str: str):
+    """Get transcript by date string (e.g., '3rd_May')."""
+    transcript_filename = f"{date_str}_file.json"
+    transcript_path = os.path.join(TRANSCRIPTS_DIR, transcript_filename)
+    
+    if not os.path.exists(transcript_path):
+        raise HTTPException(status_code=404, detail=f"Transcript not found for {date_str}")
+    
+    try:
+        with open(transcript_path, 'r') as f:
+            transcript_data = json.load(f)
+        return transcript_data
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to read transcript: {e}")
 
 
 @app.get("/audio/{filename}")
