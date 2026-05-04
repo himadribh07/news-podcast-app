@@ -142,7 +142,7 @@ export default function FeaturedEpisode({
   };
   const defaultTitle = <>Today's top stories.</>;
   const defaultSectionTitle = (
-    <>Today in <span className="sig-it">seven stories</span>.</>
+    <>Today in <span className="sig-it">major updates</span>.</>
   );
 
   // deterministic waveform bars
