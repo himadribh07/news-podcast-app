@@ -8,6 +8,25 @@ export function AudioProvider({ children }) {
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [totalTime, setTotalTime] = useState('--:--');
+  const [headline, setHeadline] = useState('');
+  const [description, setDescription] = useState('');
+  const [isGenerating, setIsGenerating] = useState(false);
+
+  // Helper to run one generate operation at a time. Pass an async function
+  // that performs the network calls; this wrapper enforces a lock and
+  // ensures `isGenerating` is toggled correctly.
+  const runGenerate = useCallback(async (fn) => {
+    if (isGenerating) {
+      return null;
+    }
+    setIsGenerating(true);
+    try {
+      const res = await fn();
+      return res;
+    } finally {
+      setIsGenerating(false);
+    }
+  }, [isGenerating]);
 
   // Initialize audio element with all event listeners
   useEffect(() => {
@@ -73,6 +92,12 @@ export function AudioProvider({ children }) {
         setDuration,
         totalTime,
         setTotalTime,
+        headline,            // NEW
+        setHeadline,         // NEW
+        description,         // NEW
+        setDescription,      // NEW
+        isGenerating,
+        runGenerate,
         setAudioSource,
         play,
         pause,

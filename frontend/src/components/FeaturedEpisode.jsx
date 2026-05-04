@@ -2,6 +2,8 @@ import React, { useMemo, useState, useContext, useEffect } from 'react';
 import { formatReleasedAt } from '../utils/formatDate';
 import { formatTimeDisplay, getFormattedDate, transcriptFormattedDate, calculateProgress, convertToMinFormat, getEpisodeNumber, getEpisodeEyebrow } from '../utils/timeUtils';
 import { AudioContext } from '../context/AudioContext';
+import API_BASE_URL from '../utils/apiConfig';
+import { highlightRandomWords } from '../utils/highlightWords';
 /**
  * Big "today's episode" hero card with placeholder cover art + waveform.
  * Fetches audio and transcript data from backend API.
@@ -24,7 +26,7 @@ export default function FeaturedEpisode({
   isNew       = true,
   show        = 'Morning Briefing',
   title,
-  description = "Host Mara Okafor walks through rate-cut expectations, the quiet AI bill that moved out of committee last night, and why this month's census numbers are about to reshape three congressional districts — plus four more stories in under twenty minutes.",
+  description = "",
 }) {
   const audio = useContext(AudioContext);
   const [isLoading, setIsLoading] = useState(false);
@@ -50,6 +52,20 @@ export default function FeaturedEpisode({
   const displayCurrentTime = formatTimeDisplay(audio.currentTime);
   const dynamicProgress = calculateProgress(audio.currentTime, audio.duration);
 
+  // Precompute highlighted text with hooks (must be unconditional)
+  const highlightedDescription = useMemo(() => {
+    return description ? highlightRandomWords(description, { count: 3 }) : null;
+  }, [description]);
+
+  const highlightedTranscript = useMemo(() => {
+    if (!transcript) return null;
+    return highlightRandomWords(transcript.script || '', { count: 8 });
+  }, [transcript]);
+
+  const highlightedTitle = useMemo(() => {
+    return typeof title === 'string' ? highlightRandomWords(title, { count: 3 }) : null;
+  }, [title]);
+
   const handlePlayClick = async () => {
     if (audio.playing) {
       // Already playing, just toggle pause
@@ -59,35 +75,39 @@ export default function FeaturedEpisode({
       audio.play();
     } else {
       // Need to fetch audio first
+      if (audio.isGenerating) return;
       setIsLoading(true);
       try {
-        const res = await fetch('https://news-podcast-app.onrender.com/generate', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ genres: null, states: null }),
-        });
-        if (!res.ok) {
-          console.error('Generate request failed', await res.text());
-          setIsLoading(false);
-          return;
-        }
-        const json = await res.json();
-        const audioRes = await fetch(`https://news-podcast-app.onrender.com${json.audio_url}`);
-        if (!audioRes.ok) {
-          console.error('Failed to fetch audio', await audioRes.text());
-          setIsLoading(false);
-          return;
-        }
-        const blob = await audioRes.blob();
-        const url = URL.createObjectURL(blob);
-        console.log('API Response totalTime:', json.totalTime);
-        const convertedDuration = convertToMinFormat(json.totalTime);
-        console.log('Converted duration:', convertedDuration);
+        await audio.runGenerate(async () => {
+          const res = await fetch(`${API_BASE_URL}/generate`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ genres: null, states: null }),
+          });
+          if (!res.ok) {
+            console.error('Generate request failed', await res.text());
+            return null;
+          }
+          const json = await res.json();
+          const audioRes = await fetch(`${API_BASE_URL}${json.audio_url}`);
+          if (!audioRes.ok) {
+            console.error('Failed to fetch audio', await audioRes.text());
+            return null;
+          }
+          const blob = await audioRes.blob();
+          const url = URL.createObjectURL(blob);
+          console.log('API Response totalTime:', json.totalTime);
+          const convertedDuration = convertToMinFormat(json.totalTime);
+          console.log('Converted duration:', convertedDuration);
 
-        // Set the shared audio source and play
-        audio.setAudioSource(url);
-        audio.setTotalTime(json.totalTime);
-        audio.play();
+          // Set the shared audio source and play
+          audio.setAudioSource(url);
+          audio.setTotalTime(json.totalTime);
+          audio.setHeadline(json.headline ?? '');
+          audio.setDescription(json.description ?? '');
+          audio.play();
+          return json;
+        });
       } catch (err) {
         console.error(err);
       } finally {
@@ -105,7 +125,7 @@ export default function FeaturedEpisode({
     setTranscriptLoading(true);
     try {
       const dateStr = getFormattedDate();
-      const res = await fetch(`https://news-podcast-app.onrender.com/transcript/${dateStr}`);
+      const res = await fetch(`${API_BASE_URL}/transcript/${dateStr}`);
       if (!res.ok) {
         console.error('Failed to fetch transcript');
         setTranscriptLoading(false);
@@ -120,9 +140,7 @@ export default function FeaturedEpisode({
       setTranscriptLoading(false);
     }
   };
-  const defaultTitle = (
-    <>Markets brace for the Fed, and the <em>real</em> story behind the census release.</>
-  );
+  const defaultTitle = <>Today's top stories.</>;
   const defaultSectionTitle = (
     <>Today in <span className="sig-it">seven stories</span>.</>
   );
@@ -186,8 +204,10 @@ export default function FeaturedEpisode({
               <span>{convertToMinFormat(audio.totalTime)}</span>
             </div>
 
-            <h3 className="sig-feat__title">{title ?? defaultTitle}</h3>
-            <p className="sig-feat__desc">{description}</p>
+            <h3 className="sig-feat__title">{highlightedTitle || title || defaultTitle}</h3>
+            <p className="sig-feat__desc">
+              {highlightedDescription || "Today's headlines distilled into a quick listen."}
+            </p>
 
             <div className="sig-feat__wave">
               {bars.map((h, i) => (
@@ -204,7 +224,7 @@ export default function FeaturedEpisode({
             </div>
 
             <div className="sig-feat__actions">
-              <button className="sig-btn sig-btn--primary" onClick={handlePlayClick} disabled={isLoading}>
+              <button className="sig-btn sig-btn--primary" onClick={handlePlayClick} disabled={isLoading || audio.isGenerating}>
                 <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor">
                   {audio.playing ? (
                     <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z" />
@@ -229,7 +249,7 @@ export default function FeaturedEpisode({
             <h2>Transcript · {transcriptFormattedDate()}</h2>
             {transcript && (
               <div className="sig-transcript-modal__body">
-                <p>{transcript.script}</p>
+                <p>{highlightedTranscript}</p>
               </div>
             )}
           </div>

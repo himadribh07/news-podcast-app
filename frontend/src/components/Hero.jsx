@@ -1,6 +1,8 @@
-import React, { useContext, useState } from 'react';
+import React, { useContext, useState, useMemo } from 'react';
 import { formatEyebrowDate } from '../utils/formatDate';
 import { AudioContext } from '../context/AudioContext';
+import API_BASE_URL from '../utils/apiConfig';
+import { highlightRandomWords } from '../utils/highlightWords';
 
 export default function Hero({
   eyebrowDate,
@@ -18,37 +20,51 @@ export default function Hero({
   const audio = useContext(AudioContext);
   const [isLoading, setIsLoading] = useState(false);
   const displayEyebrowDate = eyebrowDate ?? formatEyebrowDate();
+  // Precompute highlighted headline to keep hooks stable
+  const highlightedHeadline = useMemo(() => {
+    return typeof headline === 'string' ? highlightRandomWords(headline, { count: 3 }) : null;
+  }, [headline]);
 
   const handlePlayClick = async () => {
     if (audio.playing) {
       audio.togglePlayPause();
-    } else if (audio.audioRef.current?.src) {
+      return;
+    }
+
+    if (audio.audioRef.current?.src) {
       audio.play();
-    } else {
-      // Need to fetch audio first
-      setIsLoading(true);
-      try {
-        const res = await fetch('https://news-podcast-app.onrender.com/generate', {
+      return;
+    }
+
+    // Prevent multiple concurrent generate calls across the app.
+    if (audio.isGenerating) return;
+
+    setIsLoading(true);
+    try {
+      await audio.runGenerate(async () => {
+        const res = await fetch(`${API_BASE_URL}/generate`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({}),
         });
         if (!res.ok) {
           console.error('Generate failed', await res.text());
-          setIsLoading(false);
-          return;
+          return null;
         }
         const json = await res.json();
         console.log('API totalTime:', json.totalTime);
 
-        audio.setAudioSource(`https://news-podcast-app.onrender.com${json.audio_url}`);
+        audio.setAudioSource(`${API_BASE_URL}${json.audio_url}`);
         audio.setTotalTime(json.totalTime ?? '--:--');
+        audio.setHeadline(json.headline ?? '');
+        audio.setDescription(json.description ?? '');
         audio.play();
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setIsLoading(false);
-      }
+        return json;
+      });
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -58,7 +74,7 @@ export default function Hero({
     : '-- min';
 
   const defaultHeadline = (
-    <>The news you need, <span className="sig-it">without</span> the noise you don't.</>
+    <>The news that <span className="sig-it">matters</span>. Nothing that doesn't.</>
   );
 
   return (
@@ -75,7 +91,9 @@ export default function Hero({
           <span className="sig-pill">{eyebrowDuration}</span>
         </div>
 
-        <h1 className="sig-hero__headline">{headline ?? defaultHeadline}</h1>
+        <h1 className="sig-hero__headline">
+          {highlightedHeadline || (headline ?? defaultHeadline)}
+        </h1>
 
         <div className="sig-hero__thesis">
           <span className="sig-hero__thesis-tag">{thesisTag}</span>
@@ -85,7 +103,7 @@ export default function Hero({
         <p className="sig-hero__sub">{sub}</p>
 
         <div className="sig-hero__ctas">
-          <button className="sig-btn sig-btn--accent" onClick={handlePlayClick} disabled={isLoading}>
+          <button className="sig-btn sig-btn--accent" onClick={handlePlayClick} disabled={isLoading || audio.isGenerating}>
             <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor">
               {isLoading ? <path d="M12 4v16M12 4v16" /> : playing ? <path d="M6 4h4v16H6zM14 4h4v16h-4z" /> : <path d="M8 5v14l11-7z" />}
             </svg>

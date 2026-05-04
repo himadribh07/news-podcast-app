@@ -1,5 +1,6 @@
 import React, { useEffect, useContext } from 'react';
 import { AudioProvider, AudioContext } from './context/AudioContext';
+import API_BASE_URL from './utils/apiConfig';
 import './App.css';
 
 import Nav              from './components/Nav';
@@ -11,12 +12,22 @@ import Subscribe        from './components/Subscribe';
 import Footer           from './components/Footer';
 
 function AppInner() {
-  const { playing, totalTime, setTotalTime, setAudioSource, togglePlayPause } = useContext(AudioContext);
+  const {
+    playing,
+    totalTime,
+    headline,
+    description,
+    setTotalTime,
+    setHeadline,
+    setDescription,
+    setAudioSource,
+    togglePlayPause,
+  } = useContext(AudioContext);
 
   useEffect(() => {
     (async () => {
       try {
-        const res = await fetch('https://news-podcast-app.onrender.com/generate', {
+        const res = await fetch(`${API_BASE_URL}/generate`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({}),
@@ -29,12 +40,14 @@ function AppInner() {
         console.log('API totalTime:', json.totalTime);
 
         setTotalTime(json.totalTime ?? '--:--');
-        setAudioSource(`https://news-podcast-app.onrender.com${json.audio_url}`);
+        setHeadline(json.headline ?? '');
+        setDescription(json.description ?? '');
+        setAudioSource(`${API_BASE_URL}${json.audio_url}`);
       } catch (err) {
         console.error(err);
       }
     })();
-  }, [setAudioSource, setTotalTime]);
+  },[setAudioSource, setTotalTime, setHeadline, setDescription]);
 
   return (
     <div className="sig">
@@ -47,7 +60,13 @@ function AppInner() {
           onSecondary={() => console.log('archive')}
         />
         <Ticker />
-        <FeaturedEpisode />
+        <FeaturedEpisode
+          title={headline}
+          description={description}
+          totalTime={totalTime}
+          playing={playing}
+          onPlay={togglePlayPause}
+        />
         <EpisodeList onPlay={togglePlayPause} onViewAll={() => console.log('all')} />
         <Subscribe onSelect={(p) => console.log('platform', p)} />
       </main>

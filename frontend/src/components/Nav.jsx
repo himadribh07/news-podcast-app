@@ -13,8 +13,8 @@ import BrandMark from './BrandMark';
 export default function Nav({
   links = [
     { label: 'Episodes', href: '#episodes' },
-    { label: 'Topics',   href: '#topics'   },
-    { label: 'Hosts',    href: '#hosts'    },
+    // { label: 'Topics',   href: '#topics'   },
+    // { label: 'Hosts',    href: '#hosts'    },
     { label: 'Archive',  href: '#archive'  },
     { label: 'About',    href: '#about'    },
   ],

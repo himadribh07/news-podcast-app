@@ -3,6 +3,8 @@
  * @param {number} seconds - Time in seconds
  * @returns {string} Formatted time as MM:SS
  */
+import API_BASE_URL from './apiConfig';
+
 export const formatTimeDisplay = (seconds) => {
   if (!seconds || isNaN(seconds)) return '00:00';
   const mins = Math.floor(seconds / 60);
@@ -81,7 +83,7 @@ export const convertToMinFormat = (timeString) => {
  */
 export const getEpisodeNumber = async () => {
   try {
-    const res = await fetch('https://news-podcast-app.onrender.com/episode-count');
+    const res = await fetch(`${API_BASE_URL}/episode-count`);
     if (!res.ok) throw new Error('Failed to fetch episode count');
     const data = await res.json();
     return data.totalEpisodes || 1;
