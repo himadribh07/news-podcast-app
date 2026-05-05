@@ -13,8 +13,19 @@ from datetime import datetime
 from pydantic import BaseModel
 from typing import List, Optional
 from mutagen.mp3 import MP3
+import boto3
 
 load_dotenv()
+# R2 init
+r2_client = boto3.client(
+    "s3",
+    endpoint_url=os.getenv("R2_ENDPOINT"),
+    aws_access_key_id=os.getenv("R2_ACCESS_KEY"),
+    aws_secret_access_key=os.getenv("R2_SECRET_KEY"),
+    region_name="auto",
+)
+R2_BUCKET = os.getenv("R2_BUCKET", "signal-newspodcast")
+R2_PUBLIC_URL = os.getenv("R2_PUBLIC_URL", "").rstrip("/")
 
 API_KEY = os.getenv("API_KEY", "").strip()
 if not API_KEY:
@@ -148,18 +159,21 @@ def get_date_formatted() -> str:
 
 
 def check_existing_audio():
-    """Check if audio for today already exists."""
+    """Check R2 for today's audio file."""
     date_str = get_date_formatted()
-    audio_file = f"{date_str}_audio.mp3"
-    transcript_file = f"{date_str}_file.json"
-    audio_path = os.path.join(OUTPUT_DIR, audio_file)
-    transcript_path = os.path.join(TRANSCRIPTS_DIR, transcript_file)
+    audio_filename = f"{date_str}_audio.mp3"
+    transcript_filename = f"{date_str}_file.json"
 
-    if os.path.exists(audio_path) and os.path.exists(transcript_path):
-        with open(transcript_path, 'r') as f:
-            transcript_data = json.load(f)
+    try:
+        # check audio exists in R2
+        r2_client.head_object(Bucket=R2_BUCKET, Key=f"episodes/{audio_filename}")
+
+        # fetch transcript JSON from R2
+        resp = r2_client.get_object(Bucket=R2_BUCKET, Key=f"transcripts/{transcript_filename}")
+        transcript_data = json.loads(resp["Body"].read().decode("utf-8"))
+
         return {
-            "audio_url": f"/static/{audio_file}",
+            "audio_url": f"{R2_PUBLIC_URL}/episodes/{audio_filename}",
             "transcript_url": f"/transcript/{date_str}",
             "date": transcript_data.get("date"),
             "genres": transcript_data.get("genres"),
@@ -170,7 +184,8 @@ def check_existing_audio():
             "totalTime": transcript_data.get("totalTime"),
             "cached": True,
         }
-    return None
+    except Exception:
+        return None
 
 
 def clean_inline(text: str) -> str:
@@ -327,7 +342,7 @@ async def generate_episode(req: GenerateRequest):
     audio_filename = f"{date_str}_audio.mp3"
     transcript_filename = f"{date_str}_file.json"
     audio_path = os.path.join(OUTPUT_DIR, audio_filename)
-    transcript_path = os.path.join(TRANSCRIPTS_DIR, transcript_filename)
+    # transcript_path = os.path.join(TRANSCRIPTS_DIR, transcript_filename)
 
     try:
         tts = gTTS(clean_news_text, lang="en", tld="co.in")
@@ -346,14 +361,32 @@ async def generate_episode(req: GenerateRequest):
         "script": clean_news_text,
         "totalTime": total_time,
     }
+
     try:
-        with open(transcript_path, 'w') as f:
-            json.dump(transcript_data, f, indent=2)
+        # upload audio to R2
+        r2_client.upload_file(
+            audio_path,
+            R2_BUCKET,
+            f"episodes/{audio_filename}",
+        )
+        audio_public_url = f"{R2_PUBLIC_URL}/episodes/{audio_filename}"
+
+        # upload transcript JSON to R2
+        r2_client.put_object(
+            Bucket=R2_BUCKET,
+            Key=f"transcripts/{transcript_filename}",
+            Body=json.dumps(transcript_data, indent=2).encode("utf-8"),
+            ContentType="application/json",
+        )
+
+        # clean local temp files
+        os.remove(audio_path)
+
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to save transcript: {e}")
+        raise HTTPException(status_code=500, detail=f"R2 upload failed: {e}")
 
     return JSONResponse({
-        "audio_url": f"/static/{audio_filename}",
+        "audio_url": audio_public_url,    # ← full R2 public URL now
         "transcript_url": f"/transcript/{date_str}",
         "date": transcript_data["date"],
         "genres": selected_genres,
@@ -373,15 +406,13 @@ async def health():
 
 @app.get("/episode-count")
 async def get_episode_count():
-    """Get total number of episodes produced by counting transcript files."""
     try:
-        if not os.path.exists(TRANSCRIPTS_DIR):
-            return {"totalEpisodes": 0}
-
-        transcript_files = [f for f in os.listdir(TRANSCRIPTS_DIR) if f.endswith("_file.json")]
-        total_episodes = len(transcript_files)
-
-        return {"totalEpisodes": total_episodes}
+        resp = r2_client.list_objects_v2(
+            Bucket=R2_BUCKET,
+            Prefix="episodes/"
+        )
+        count = len([o for o in resp.get("Contents", []) if o["Key"].endswith(".mp3")])
+        return {"totalEpisodes": max(count, 1)}
     except Exception as e:
         print(f"Error counting episodes: {e}")
         return {"totalEpisodes": 1}
@@ -389,19 +420,15 @@ async def get_episode_count():
 
 @app.get("/transcript/{date_str}")
 async def get_transcript(date_str: str):
-    """Get transcript by date string (e.g., '3rd_May')."""
     transcript_filename = f"{date_str}_file.json"
-    transcript_path = os.path.join(TRANSCRIPTS_DIR, transcript_filename)
-
-    if not os.path.exists(transcript_path):
-        raise HTTPException(status_code=404, detail=f"Transcript not found for {date_str}")
-
     try:
-        with open(transcript_path, 'r') as f:
-            transcript_data = json.load(f)
-        return transcript_data
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to read transcript: {e}")
+        resp = r2_client.get_object(
+            Bucket=R2_BUCKET,
+            Key=f"transcripts/{transcript_filename}"
+        )
+        return json.loads(resp["Body"].read().decode("utf-8"))
+    except Exception:
+        raise HTTPException(status_code=404, detail=f"Transcript not found for {date_str}")
 
 
 @app.get("/audio/{filename}")
