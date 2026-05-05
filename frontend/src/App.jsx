@@ -42,7 +42,11 @@ function AppInner() {
         setTotalTime(json.totalTime ?? '--:--');
         setHeadline(json.headline ?? '');
         setDescription(json.description ?? '');
-        setAudioSource(`${API_BASE_URL}${json.audio_url}`);
+        // setAudioSource(`${API_BASE_URL}${json.audio_url}`);
+        const audioUrl = json.audio_url.startsWith('http')
+          ? json.audio_url
+          : `${API_BASE_URL}${json.audio_url}`;
+        setAudioSource(audioUrl);
       } catch (err) {
         console.error(err);
       }

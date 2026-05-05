@@ -13,3 +13,4 @@ __pycache__/
 static/ 
 transcripts/
 node_modules/
+test_r2.py
