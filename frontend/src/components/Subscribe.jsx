@@ -18,7 +18,7 @@ export default function Subscribe({
   onSelect,
 }) {
   const defaultTitle = (
-    <>Seven stories, <span className="sig-it">every</span> weekday.<br />In your feed by 6am.</>
+    <>Every story, <span className="sig-it">every</span> weekday.<br />In your feed at your time.</>
   );
 
   return (

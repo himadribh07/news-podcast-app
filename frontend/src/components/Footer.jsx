@@ -88,21 +88,20 @@ export default function Footer({
 
 const DEFAULT_COLUMNS = [
   { title: 'Listen', links: [
-    { label: 'Latest episode', href: '#' },
-    { label: 'Archive',        href: '#' },
-    { label: 'Transcripts',    href: '#' },
-    { label: 'RSS',            href: '#' },
+    { label: 'Latest episode', href: '#featured-episode' },
+    { label: 'Archive',        href: '#archive' },
+    // { label: 'Transcripts',    href: '#' },
   ]},
   { title: 'About', links: [
-    { label: 'Our method', href: '#' },
-    { label: 'Hosts',      href: '#' },
-    { label: 'Newsroom',   href: '#' },
+    // { label: 'Our method', href: '#' },
+    // { label: 'Hosts',      href: '#' },
+    // { label: 'Newsroom',   href: '#' },
     { label: 'Contact',    href: '#' },
   ]},
   { title: 'More', links: [
     { label: 'Newsletter', href: '#' },
-    { label: 'Merch',      href: '#' },
-    { label: 'Press',      href: '#' },
+    // { label: 'Merch',      href: '#' },
+    // { label: 'Press',      href: '#' },
     { label: 'Support us', href: '#' },
   ]},
 ];
