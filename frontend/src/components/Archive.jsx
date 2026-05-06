@@ -72,6 +72,9 @@ export default function Archive({ onClose }) {
       } finally {
         setLoading(false);
       }
+      
+      // Scroll to top when Archive mounts
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     })();
 
     audioRef.current = new Audio();

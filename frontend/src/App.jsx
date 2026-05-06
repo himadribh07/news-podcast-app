@@ -20,6 +20,28 @@ function AppInner() {
 
   const [view, setView] = useState('home'); // 'home' | 'archive'
 
+  // Sync view with URL hash
+  useEffect(() => {
+    const handleHashChange = () => {
+      const hash = window.location.hash.slice(1) || 'home'; // Remove '#' prefix
+      if (hash === 'archive' || hash === 'home') {
+        setView(hash);
+      }
+    };
+
+    // Set initial view from URL
+    handleHashChange();
+
+    // Listen for hash changes (back/forward button, manual URL edit)
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
+
+  // Update URL when view changes
+  useEffect(() => {
+    window.location.hash = view;
+  }, [view]);
+
   useEffect(() => {
     (async () => {
       try {
