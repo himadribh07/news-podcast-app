@@ -9,7 +9,7 @@ from google import genai
 from google.genai import types
 from dotenv import load_dotenv
 from gtts import gTTS
-from datetime import datetime
+from datetime import datetime, timedelta
 from pydantic import BaseModel
 from typing import List, Optional
 from mutagen.mp3 import MP3
@@ -222,6 +222,105 @@ def parse_episode_response(raw_text: str) -> dict:
     return {"headline": headline, "description": description, "script": script}
 
 
+def parse_date_str(date_str: str) -> Optional[datetime]:
+    """
+    Parse date string like '6th_May' or '21st_June' to datetime object.
+    Assumes current year.
+    """
+    try:
+        if not date_str or "_" not in date_str:
+            return None
+        
+        day_part, month_part = date_str.split("_", 1)
+        # Remove ordinal suffix (st, nd, rd, th)
+        day = int(re.sub(r"st|nd|rd|th", "", day_part))
+        
+        # Get current year
+        year = datetime.now().year
+        
+        # Parse month and create date
+        date_obj = datetime.strptime(f"{month_part} {day} {year}", "%B %d %Y")
+        return date_obj
+    except Exception as e:
+        print(f"Failed to parse date_str '{date_str}': {e}")
+        return None
+
+
+def cleanup_old_episodes():
+    """
+    Delete episodes and transcripts older than 14 days.
+    Called after generating a new episode.
+    """
+    try:
+        print("\n[CLEANUP] Starting cleanup of episodes older than 14 days...")
+        
+        # List all transcript files
+        resp = r2_client.list_objects_v2(
+            Bucket=R2_BUCKET,
+            Prefix="transcripts/"
+        )
+        
+        contents = resp.get("Contents", [])
+        if not contents:
+            print("[CLEANUP] No episodes found in R2")
+            return
+        
+        print(f"[CLEANUP] Found {len(contents)} objects in transcripts/")
+        
+        now = datetime.now()
+        fourteen_days_ago = now - timedelta(days=14)
+        
+        deleted_count = 0
+        
+        for obj in contents:
+            key = obj["Key"]
+            
+            if not key.endswith(".json"):
+                continue
+            
+            # Extract date_str from filename (e.g., "transcripts/3rd_May_file.json" -> "3rd_May")
+            date_str = key.replace("transcripts/", "").replace("_file.json", "")
+            
+            # Parse date
+            episode_date = parse_date_str(date_str)
+            if not episode_date:
+                print(f"[CLEANUP] Could not parse date from '{date_str}', skipping")
+                continue
+            
+            # Check if older than 14 days
+            if episode_date < fourteen_days_ago:
+                print(f"[CLEANUP] Deleting old episode: {date_str} (created: {episode_date.date()})")
+                
+                try:
+                    # Delete transcript file
+                    r2_client.delete_object(
+                        Bucket=R2_BUCKET,
+                        Key=f"transcripts/{date_str}_file.json"
+                    )
+                    print(f"[CLEANUP] ✓ Deleted transcript: {date_str}_file.json")
+                    
+                    # Delete corresponding audio file
+                    r2_client.delete_object(
+                        Bucket=R2_BUCKET,
+                        Key=f"episodes/{date_str}_audio.mp3"
+                    )
+                    print(f"[CLEANUP] ✓ Deleted audio: {date_str}_audio.mp3")
+                    
+                    deleted_count += 1
+                except Exception as e:
+                    print(f"[CLEANUP] Error deleting files for {date_str}: {e}")
+                    continue
+            else:
+                print(f"[CLEANUP] Keeping episode: {date_str} (created: {episode_date.date()})")
+        
+        print(f"[CLEANUP] Cleanup complete. Deleted {deleted_count} old episode(s).\n")
+        
+    except Exception as e:
+        print(f"[CLEANUP] Error during cleanup: {e}")
+        import traceback
+        traceback.print_exc()
+
+
 def build_prompt(genres: List[str], states: List[str]) -> str:
     genre_instructions = "".join(GENRE_BLOCKS[g] for g in genres if g in GENRE_BLOCKS)
 
@@ -310,7 +409,7 @@ async def generate_episode(req: GenerateRequest):
 
     try:
         resp = client.models.generate_content(
-            model="gemini-2.5-flash",
+            model="gemini-2.5-pro",
             contents=prompt,
             config=types.GenerateContentConfig(
                 tools=[{"google_search": {}}]
@@ -381,6 +480,9 @@ async def generate_episode(req: GenerateRequest):
 
         # clean local temp files
         os.remove(audio_path)
+
+        # Cleanup old episodes (older than 14 days)
+        cleanup_old_episodes()
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"R2 upload failed: {e}")

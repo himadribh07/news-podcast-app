@@ -9,7 +9,8 @@ Signal is a daily briefing platform that:
 - **Synthesizes** MP3 audio using Google Text-to-Speech (gTTS)
 - **Stores** episodes in Cloudflare R2 (S3-compatible object storage)
 - **Serves** episodes with a beautiful React + Vite frontend
-- **Archives** episodes for 14 days with search and playback
+- **Archives** episodes for 14 days with automatic cleanup
+- **Auto-cleans** old episodes: keeps only the last 14 days, deletes older ones automatically when new episodes are added
 
 **Features:**
 - ✨ Daily auto-generated episode with 3-part content (headline, description, script)
@@ -19,7 +20,8 @@ Signal is a daily briefing platform that:
 - 📱 Responsive design (mobile-first)
 - 🌙 Dark theme with accent colors
 - ⚡ Zero-concurrency race condition prevention
-- 🔄 14-day archive with filtering
+- 🔄 14-day archive with automatic cleanup
+- 🗑️ **Automatic deletion of episodes older than 14 days**
 
 ## 🛠️ Tech Stack
 
@@ -239,7 +241,43 @@ Fetch transcript for a specific episode.
 - FeaturedEpisode plays smoothly regardless of past episode selection
 - Clear separation of concerns
 
-## 📊 Episode Numbering
+## �️ Automatic Cleanup (14-Day Retention)
+
+Episodes are automatically retained for exactly 14 days. Older episodes are deleted automatically when a new episode is generated.
+
+**How it works:**
+1. When `/generate` endpoint is called, a new episode is created and uploaded to R2
+2. After successful upload, `cleanup_old_episodes()` is triggered
+3. The function scans all transcript files in R2
+4. Episodes with `created_at` date older than 14 days are identified
+5. Both the **audio file** (`{date}_audio.mp3`) and **transcript** (`{date}_file.json`) are deleted
+6. Cleanup logs are printed to backend console for monitoring
+
+**Example cleanup log:**
+```
+[CLEANUP] Starting cleanup of episodes older than 14 days...
+[CLEANUP] Found 20 objects in transcripts/
+[CLEANUP] Keeping episode: 6th_May (created: 2026-05-06)
+[CLEANUP] Keeping episode: 5th_May (created: 2026-05-05)
+[CLEANUP] Deleting old episode: 22nd_April (created: 2026-04-22)
+[CLEANUP] ✓ Deleted transcript: 22nd_April_file.json
+[CLEANUP] ✓ Deleted audio: 22nd_April_audio.mp3
+[CLEANUP] Cleanup complete. Deleted 1 old episode(s).
+```
+
+**Benefits:**
+- 💰 Reduces R2 storage costs (only stores 2 weeks of content)
+- 🧹 No manual cleanup required
+- ⚡ Automatic during peak generation time (after /generate succeeds)
+- 📊 Consistent 14-day window always maintained
+
+**Technical Details:**
+- Uses `parse_date_str()` to extract and parse date from filename
+- Compares episode date against `datetime.now() - timedelta(days=14)`
+- Deletes both transcript JSON and audio MP3 simultaneously
+- Errors during cleanup are logged but don't fail the `/generate` request
+
+## 📊 Storage Optimization
 
 **Universal numbering system:**
 - Based on `created_at` ISO timestamp (oldest → newest)
@@ -310,6 +348,23 @@ Random words in headlines/descriptions highlighted with CSS class:
 - Used in: Hero headline, descriptions, transcripts
 
 ## 📝 Development Notes
+
+### Backend Helper Functions
+
+**Cleanup Functions:**
+- `parse_date_str(date_str)` — Converts date strings like "6th_May" to datetime objects
+- `cleanup_old_episodes()` — Scans R2 and deletes episodes older than 14 days
+
+**Example usage in code:**
+```python
+# Called automatically after uploading new episode
+cleanup_old_episodes()
+
+# Parse a date string to check age
+episode_date = parse_date_str("6th_May")
+if episode_date < datetime.now() - timedelta(days=14):
+    # Delete old episode
+```
 
 ### Common Tasks
 
