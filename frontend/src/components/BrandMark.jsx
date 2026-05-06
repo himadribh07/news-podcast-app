@@ -4,13 +4,25 @@ export default function BrandMark({
   name = 'Signal',
   tag = 'Daily Briefing',
   href = '#',
+  onDailyBriefingClick,
 }) {
   return (
     <a href={href} className="sig-brand">
       <span className="sig-brand__mark" />
       <span className="sig-brand__name">{name}</span>
       <span className="sig-brand__divider">·</span>
-      <span className="sig-brand__tag">{tag}</span>
+      <span 
+        className="sig-brand__tag" 
+        onClick={(e) => {
+          if (onDailyBriefingClick) {
+            e.preventDefault();
+            onDailyBriefingClick();
+          }
+        }}
+        style={{ cursor: onDailyBriefingClick ? 'pointer' : 'inherit' }}
+      >
+        {tag}
+      </span>
 
       <style>{`
         .sig-brand {

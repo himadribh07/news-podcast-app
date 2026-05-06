@@ -53,6 +53,13 @@ function AppInner() {
           onListenNow={() => setView('home')}
           onArchive={() => setView('archive')}
           onEpisodes={() => setView('home')}
+          onDailyBriefing={() => {
+            setView('home');
+            setTimeout(() => {
+              const el = document.getElementById('featured-episode');
+              if (el) el.scrollIntoView({ behavior: 'smooth' });
+            }, 100);
+          }}
           onHome={() => setView('home')}
         />
         <Archive onClose={() => setView('home')} />
@@ -69,6 +76,12 @@ function AppInner() {
         onListenNow={togglePlayPause}
         onArchive={() => setView('archive')}
         onEpisodes={() => setView('home')}
+        onDailyBriefing={() => {
+          setTimeout(() => {
+            const el = document.getElementById('featured-episode');
+            if (el) el.scrollIntoView({ behavior: 'smooth' });
+          }, 50);
+        }}
         onHome={() => setView('home')}
       />
       <main>

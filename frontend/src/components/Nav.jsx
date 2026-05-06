@@ -23,6 +23,7 @@ export default function Nav({
   onListenNow,
   onArchive,
   onEpisodes,
+  onDailyBriefing,
   onHome,
   brandName,
   brandTag,
@@ -69,6 +70,7 @@ export default function Nav({
             <BrandMark
               name={brandName}
               tag={brandTag}
+              onDailyBriefingClick={onDailyBriefing}
             />
           </a>
         </div>
@@ -155,6 +157,7 @@ export default function Nav({
         .sig-nav__links a {
           display: inline-flex;
           align-items: center;
+          height: 100%;
 
           font-family: var(--mono);
           font-size: 11px;

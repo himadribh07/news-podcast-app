@@ -158,7 +158,7 @@ export default function FeaturedEpisode({
   const playedTo = Math.round(bars.length * dynamicProgress);
 
   return (
-    <section className="sig-section">
+    <section className="sig-section" id="featured-episode">
       <div className="sig-wrap">
         <div className="sig-section__head">
           <div>
