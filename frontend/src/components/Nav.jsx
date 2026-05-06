@@ -9,18 +9,20 @@ import BrandMark from './BrandMark';
  *   onSubscribe()                         click handler for the Subscribe button
  *   onListenNow()                         click handler for the primary CTA
  *   onArchive()                           click handler for Archive link
+ *   onEpisodes()                          click handler for Episodes link
  *   onHome()                              click handler for BrandMark click
  *   brandName, brandTag                   passed to <BrandMark />
  */
 export default function Nav({
   links = [
-    { label: 'Episodes', href: '#episodes' },
+    { label: 'Episodes', href: '#episodes', action: 'episodes' },
     { label: 'Archive', href: '#', action: 'archive' },
     { label: 'About', href: '#about' },
   ],
   onSubscribe,
   onListenNow,
   onArchive,
+  onEpisodes,
   onHome,
   brandName,
   brandTag,
@@ -28,10 +30,19 @@ export default function Nav({
   const handleNavClick = (link, e) => {
     if (link.action === 'archive') {
       e.preventDefault();
-
       if (onArchive) {
         onArchive();
       }
+    } else if (link.action === 'episodes') {
+      e.preventDefault();
+      if (onEpisodes) {
+        onEpisodes();
+      }
+      // Allow browser to scroll to #episodes anchor after navigation
+      setTimeout(() => {
+        const el = document.getElementById('episodes');
+        if (el) el.scrollIntoView({ behavior: 'smooth' });
+      }, 100);
     }
   };
 

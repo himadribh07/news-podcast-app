@@ -1,6 +1,7 @@
-import React, { useEffect, useState, useContext } from 'react';
+import React, { useEffect, useState, useContext, useRef } from 'react';
 import API_BASE_URL from '../utils/apiConfig';
 import { AudioContext } from '../context/AudioContext';
+import ArrowIcon from './ArrowIcon';
 
 export default function EpisodeList({
   eyebrow = '◇ Recent episodes',
@@ -8,9 +9,11 @@ export default function EpisodeList({
   onViewAll,
 }) {
   const audio = useContext(AudioContext);
+  const audioRef = useRef(null);  // Local audio element for past episodes
   const [episodes, setEpisodes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [playingEpisodeDateStr, setPlayingEpisodeDateStr] = useState(null);
+  const [isPlaying, setIsPlaying] = useState(false);
   const [showTranscript, setShowTranscript] = useState(false);
   const [transcriptData, setTranscriptData] = useState(null);
 
@@ -52,31 +55,54 @@ export default function EpisodeList({
         setLoading(false);
       }
     })();
+
+    // Initialize local audio element for past episodes
+    audioRef.current = new Audio();
+    audioRef.current.addEventListener('ended', () => setIsPlaying(false));
+
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+    };
   }, []);
 
-  const handlePlay = (ep) => {
-    // If already playing this episode
-    if (playingEpisodeDateStr === ep.date_str && audio.playing) {
-      audio.pause();
-      return;
+  // Pause local audio if today's episode (shared audio) starts playing
+  useEffect(() => {
+    if (audio?.playing && audioRef.current) {
+      audioRef.current.pause();
+      setIsPlaying(false);
     }
-    // If this episode is loaded but paused
-    if (playingEpisodeDateStr === ep.date_str && !audio.playing) {
-      audio.play();
+  }, [audio?.playing]);
+
+  const handlePlay = (ep) => {
+    // Pause today's episode if it's playing
+    if (audio?.playing) audio.pause();
+
+    // If already playing this episode
+    if (playingEpisodeDateStr === ep.date_str) {
+      if (isPlaying) {
+        audioRef.current.pause();
+        setIsPlaying(false);
+      } else {
+        audioRef.current.play();
+        setIsPlaying(true);
+      }
       return;
     }
     // Load new episode
-    audio.setAudioSource(ep.audio_url);
-    audio.setTotalTime(ep.totalTime);
+    audioRef.current.src = ep.audio_url;
+    audioRef.current.play();
     setPlayingEpisodeDateStr(ep.date_str);
-    audio.play();
+    setIsPlaying(true);
   };
 
   const handleShowTranscript = async (ep) => {
     try {
       const res = await fetch(`${API_BASE_URL}/transcript/${ep.date_str}`);
       const data = await res.json();
-      setTranscriptData(data);
+      setTranscriptData({ ...data, date_str: ep.date_str, num: ep.num });
       setShowTranscript(true);
     } catch (err) {
       console.error('Failed to fetch transcript', err);
@@ -119,7 +145,7 @@ export default function EpisodeList({
   }
 
   return (
-    <section className="sig-section">
+    <section className="sig-section" id="episodes">
       <div className="sig-wrap">
         <div className="sig-section__head">
           <div>
@@ -127,8 +153,9 @@ export default function EpisodeList({
             <h2 className="sig-section__title">{title ?? defaultTitle}</h2>
           </div>
           {onViewAll && (
-            <button className="sig-btn" onClick={onViewAll}>
-              View all →
+            <button className="sig-btn sig-btn--viewall" onClick={onViewAll}>
+              <span>View all</span>
+              <ArrowIcon direction="right" size={18} />
             </button>
           )}
         </div>
@@ -148,14 +175,16 @@ export default function EpisodeList({
                 onClick={() => handleShowTranscript(ep)}
                 title="View transcript"
               >
-                📄
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                </svg>
               </button>
               <button
                 className="sig-eprow__play"
                 onClick={() => handlePlay(ep)}
                 aria-label={`Play episode ${ep.num}`}
               >
-                {playingEpisodeDateStr === ep.date_str && audio.playing ? (
+                {playingEpisodeDateStr === ep.date_str && isPlaying ? (
                   // Pause icon
                   <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor">
                     <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z" />
@@ -183,9 +212,14 @@ export default function EpisodeList({
           border-bottom: 1px solid var(--line);
           transition: background 0.15s;
         }
+        .sig-btn--viewall {
+          display: inline-flex;
+          align-items: center;
+          gap: 10px;
+        }
+
         .sig-eprow:hover { background: oklch(0.19 0.01 60 / 0.5); }
-        .sig-eprow:hover .sig-eprow__play,
-        .sig-eprow:hover .sig-eprow__transcript {
+        .sig-eprow:hover .sig-eprow__play {
           background: var(--accent); color: var(--bg);
         }
         .sig-eprow__num {
@@ -220,6 +254,13 @@ export default function EpisodeList({
           cursor: pointer;
           font-size: 16px;
         }
+        .sig-eprow__transcript {
+          color: var(--fg-dim);
+        }
+        .sig-eprow:hover .sig-eprow__transcript {
+          color: var(--accent);
+          border-color: var(--accent);
+        }
 
         .sig-transcript-modal {
           position: fixed; top: 0; left: 0; right: 0; bottom: 0;
@@ -230,35 +271,56 @@ export default function EpisodeList({
         }
         .sig-transcript-modal__content {
           background: var(--bg);
-          border-radius: 8px;
+          border: 1px solid var(--line);
+          border-radius: 14px;
           padding: 32px;
           max-width: 700px;
           width: 100%;
           max-height: 80vh;
           overflow-y: auto;
+          position: relative;
           box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
         }
         .sig-transcript-modal__close {
-          float: right;
-          font-size: 24px;
-          cursor: pointer;
-          color: var(--fg-dim);
+          position: absolute;
+          top: 16px;
+          right: 16px;
           background: none;
           border: none;
+          font-size: 24px;
+          cursor: pointer;
+          color: var(--fg-faint);
+          transition: color 0.2s;
           padding: 0;
         }
         .sig-transcript-modal__close:hover {
           color: var(--fg);
         }
-        .sig-transcript-modal h2 {
-          margin-top: 0;
-          color: var(--fg);
-          font-size: 22px;
+        .sig-transcript-modal__content h2 {
+          font-family: var(--sans);
+          font-size: 14px;
+          font-weight: 500;
+          color: var(--fg-faint);
+          margin: 0 0 12px;
+          letter-spacing: 0.08em;
+          text-transform: uppercase;
+          padding-right: 32px;
         }
-        .sig-transcript-modal p {
-          color: var(--fg-dim);
-          line-height: 1.6;
-          margin: 16px 0;
+        .sig-transcript-modal__headline {
+          font-family: var(--sans);
+          font-size: 22px;
+          font-weight: 500;
+          color: var(--fg);
+          margin: 0 0 24px;
+          line-height: 1.3;
+        }
+        .sig-transcript-modal__body {
+          font-family: var(--serif);
+          font-size: 16px;
+          line-height: 1.8;
+          color: var(--fg);
+          white-space: pre-wrap;
+          word-wrap: break-word;
         }
 
         @media (max-width: 900px) {
@@ -279,19 +341,10 @@ export default function EpisodeList({
             >
               ✕
             </button>
-            <h2>{transcriptData?.headline || 'Transcript'}</h2>
-            <div>
-              {transcriptData?.description && (
-                <p><strong>Summary:</strong> {transcriptData.description}</p>
-              )}
-              {transcriptData?.script && (
-                <div>
-                  <strong>Full Transcript:</strong>
-                  <p style={{ whiteSpace: 'pre-wrap', fontFamily: 'var(--mono)', fontSize: '13px' }}>
-                    {transcriptData.script}
-                  </p>
-                </div>
-              )}
+            <h2>Episode {String(transcriptData?.num).padStart(3, '0')} · {transcriptData?.date_str.replace('_', ' ')}</h2>
+            <h3 className="sig-transcript-modal__headline">{transcriptData?.headline}</h3>
+            <div className="sig-transcript-modal__body">
+              {transcriptData?.script}
             </div>
           </div>
         </div>

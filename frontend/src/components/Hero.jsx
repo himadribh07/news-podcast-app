@@ -3,6 +3,7 @@ import { formatEyebrowDate } from '../utils/formatDate';
 import { AudioContext } from '../context/AudioContext';
 import API_BASE_URL from '../utils/apiConfig';
 import { highlightRandomWords } from '../utils/highlightWords';
+import ArrowIcon from './ArrowIcon';
 
 export default function Hero({
   eyebrowDate,
@@ -109,9 +110,9 @@ export default function Hero({
             </svg>
             {isLoading ? 'Loading...' : playing ? `Pause · ${totalTime ?? '--:--'}` : `Play today's episode · ${totalTime ?? '--:--'}`}
           </button>
-          <button className="sig-btn" onClick={onSecondary}>
-            {secondaryLabel}
-            <span style={{ color: 'var(--accent)' }}>→</span>
+          <button className="sig-btn sig-btn--archive" onClick={onSecondary}>
+            <span>{secondaryLabel}</span>
+            <ArrowIcon direction="right" size={18} className="sig-btn__arrow" />
           </button>
         </div>
       </div>

@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef, useContext } from 'react';
 import API_BASE_URL from '../utils/apiConfig';
 import { AudioContext } from '../context/AudioContext';
+import ArrowIcon from './ArrowIcon';
 
 export default function Archive({ onClose }) {
   const audio = useContext(AudioContext);
@@ -134,7 +135,13 @@ export default function Archive({ onClose }) {
     <section className="sig-archive">
       <div className="sig-wrap">
         <div className="sig-archive__head">
-          <button className="sig-btn" onClick={onClose}>← Back</button>
+          <button
+            className="sig-btn sig-btn--back"
+            onClick={onClose}
+          >
+            <ArrowIcon direction="left" size={18} className="sig-arrow-icon--left" />
+            <span>Back</span>
+          </button>
           <div>
             <div className="sig-eyebrow">◇ Last 14 Days</div>
             <h2 className="sig-archive__title">

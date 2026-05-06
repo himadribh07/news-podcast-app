@@ -52,6 +52,7 @@ function AppInner() {
           onSubscribe={() => console.log('subscribe')}
           onListenNow={() => setView('home')}
           onArchive={() => setView('archive')}
+          onEpisodes={() => setView('home')}
           onHome={() => setView('home')}
         />
         <Archive onClose={() => setView('home')} />
@@ -67,6 +68,7 @@ function AppInner() {
         onSubscribe={() => console.log('subscribe')}
         onListenNow={togglePlayPause}
         onArchive={() => setView('archive')}
+        onEpisodes={() => setView('home')}
         onHome={() => setView('home')}
       />
       <main>
