@@ -403,6 +403,66 @@ async def generate_episode(req: GenerateRequest):
 async def health():
     return {"status": "ok"}
 
+@app.get("/episodes")
+async def get_episodes():
+    """Fetch list of past episodes from R2 transcripts."""
+    print("[/episodes] Called - fetching from R2...")
+    try:
+        resp = r2_client.list_objects_v2(
+            Bucket=R2_BUCKET,
+            Prefix="transcripts/"
+        )
+        
+        contents = resp.get("Contents", [])
+        print(f"[/episodes] Found {len(contents)} objects in R2 transcripts/")
+        
+        episodes = []
+        for obj in contents:
+            key = obj["Key"]
+            print(f"[/episodes] Processing: {key}")
+            if not key.endswith(".json"):
+                print(f"[/episodes] Skipping (not JSON): {key}")
+                continue
+            
+            try:
+                transcript_resp = r2_client.get_object(Bucket=R2_BUCKET, Key=key)
+                transcript_data = json.loads(transcript_resp["Body"].read().decode("utf-8"))
+                
+                # Extract date_str from filename (e.g., "transcripts/3rd_May_file.json" -> "3rd_May")
+                date_str = key.replace("transcripts/", "").replace("_file.json", "")
+                
+                episode = {
+                    "date_str": date_str,
+                    "num": len(episodes) + 1,
+                    "headline": transcript_data.get("headline", ""),
+                    "description": transcript_data.get("description", ""),
+                    "audio_url": f"{R2_PUBLIC_URL}/episodes/{date_str}_audio.mp3",
+                    "totalTime": transcript_data.get("totalTime", "--:--"),
+                    "created_at": transcript_data.get("date", ""),
+                }
+                episodes.append(episode)
+                print(f"[/episodes] Added: {date_str} - {episode['headline'][:50]}")
+            except Exception as e:
+                print(f"[/episodes] Error parsing {key}: {e}")
+                import traceback
+                traceback.print_exc()
+                continue
+        
+        # Sort chronologically (oldest first) for universal numbering
+        episodes.sort(key=lambda ep: ep["created_at"])
+        
+        # Assign sequential episode numbers (1 = oldest, N = latest)
+        for i, ep in enumerate(episodes):
+            ep["num"] = i + 1
+        
+        print(f"[/episodes] Returning {len(episodes)} episodes with universal numbering")
+        return {"episodes": episodes}
+    except Exception as e:
+        print(f"[/episodes] Error fetching episodes: {e}")
+        import traceback
+        traceback.print_exc()
+        return {"episodes": []}
+
 
 @app.get("/episode-count")
 async def get_episode_count():

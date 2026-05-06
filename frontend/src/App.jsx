@@ -1,4 +1,4 @@
-import React, { useEffect, useContext } from 'react';
+import React, { useEffect, useContext, useState } from 'react';
 import { AudioProvider, AudioContext } from './context/AudioContext';
 import API_BASE_URL from './utils/apiConfig';
 import './App.css';
@@ -10,19 +10,15 @@ import FeaturedEpisode  from './components/FeaturedEpisode';
 import EpisodeList      from './components/EpisodeList';
 import Subscribe        from './components/Subscribe';
 import Footer           from './components/Footer';
+import Archive          from './components/Archive';
 
 function AppInner() {
   const {
-    playing,
-    totalTime,
-    headline,
-    description,
-    setTotalTime,
-    setHeadline,
-    setDescription,
-    setAudioSource,
-    togglePlayPause,
+    playing, totalTime, headline, description,
+    setTotalTime, setHeadline, setDescription, setAudioSource, togglePlayPause,
   } = useContext(AudioContext);
+
+  const [view, setView] = useState('home'); // 'home' | 'archive'
 
   useEffect(() => {
     (async () => {
@@ -32,17 +28,12 @@ function AppInner() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({}),
         });
-        if (!res.ok) {
-          console.error('Generate failed', await res.text());
-          return;
-        }
+        if (!res.ok) return;
         const json = await res.json();
-        console.log('API totalTime:', json.totalTime);
 
         setTotalTime(json.totalTime ?? '--:--');
         setHeadline(json.headline ?? '');
         setDescription(json.description ?? '');
-        // setAudioSource(`${API_BASE_URL}${json.audio_url}`);
         const audioUrl = json.audio_url.startsWith('http')
           ? json.audio_url
           : `${API_BASE_URL}${json.audio_url}`;
@@ -51,17 +42,39 @@ function AppInner() {
         console.error(err);
       }
     })();
-  },[setAudioSource, setTotalTime, setHeadline, setDescription]);
+  }, [setAudioSource, setTotalTime, setHeadline, setDescription]);
 
+  // Archive view
+  if (view === 'archive') {
+    return (
+      <div className="sig">
+        <Nav
+          onSubscribe={() => console.log('subscribe')}
+          onListenNow={() => setView('home')}
+          onArchive={() => setView('archive')}
+          onHome={() => setView('home')}
+        />
+        <Archive onClose={() => setView('home')} />
+        <Footer />
+      </div>
+    );
+  }
+
+  // Home view
   return (
     <div className="sig">
-      <Nav onSubscribe={() => console.log('subscribe')} onListenNow={togglePlayPause} />
+      <Nav
+        onSubscribe={() => console.log('subscribe')}
+        onListenNow={togglePlayPause}
+        onArchive={() => setView('archive')}
+        onHome={() => setView('home')}
+      />
       <main>
         <Hero
           totalTime={totalTime}
           playing={playing}
           onPrimary={togglePlayPause}
-          onSecondary={() => console.log('archive')}
+          onSecondary={() => setView('archive')}
         />
         <Ticker />
         <FeaturedEpisode
@@ -71,7 +84,7 @@ function AppInner() {
           playing={playing}
           onPlay={togglePlayPause}
         />
-        <EpisodeList onPlay={togglePlayPause} onViewAll={() => console.log('all')} />
+        <EpisodeList onViewAll={() => setView('archive')} />
         <Subscribe onSelect={(p) => console.log('platform', p)} />
       </main>
       <Footer />
