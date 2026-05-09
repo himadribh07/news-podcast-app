@@ -282,6 +282,12 @@ You MUST output exactly 3 sections separated by "---" on its own line.
 Do NOT include section labels like "HEADLINE:" or "1." — just the content.
 Do NOT use markdown bold/italic in headline or description.
 
+LENGTH REQUIREMENT — CRITICAL (MUST FOLLOW):
+The TOTAL output across all 3 sections MUST be between 1000 and 1400 words.
+This produces 6-9 minutes of audio narration when read aloud.
+If your output is under 1000 words, you have failed the task.
+Count your words before finishing. Pack with real news, not filler.
+
 SECTION 1 — HEADLINE
 A single sentence summarizing today's biggest stories.
 MUST be 15-22 words.
@@ -302,15 +308,22 @@ Example: "Today's briefing opens with the latest from the Reserve Bank, then tur
 
 SECTION 3 — SCRIPT
 The full news bullets organized by category.
+This section MUST be 750-900 words on its own.
 
 Per-bullet format:
 - Each bullet starts with a bold headline
 - Followed by an em-dash and explanatory lines beneath it
 - Format: **Headline** — explanation
 
+QUANTITY RULES (STRICT):
+- MINIMUM 18 distinct news bullets across all categories
+- 2-3 bullets per category MINIMUM
+- Each category MUST have content (don't skip any)
+- No filler, no padding — every bullet must be a real distinct story from last 24 hours
+
 Length rules per category:
-- Sports, Technology, Entertainment: headline + 1-2 lines (max 25 words explanation)
-- All other categories (Front Page, International, Politics, Finance, Health): headline + 2-3 lines (40-60 words explanation)
+- Sports, Technology, Entertainment: headline + 2 lines (35-50 words explanation)
+- All other categories (Front Page, International, Politics, Finance, Health): headline + 3-4 lines (55-80 words explanation)
 
 General rules (STRICT):
 - Bullet points only
@@ -319,16 +332,16 @@ General rules (STRICT):
 - Last 24 hours only
 - Group bullets under their category heading (e.g. "## Politics")
 
-Example bullets:
+Example bullet — Politics (longer):
+**Parliament passes data protection bill** — The Lok Sabha cleared the Digital Personal Data Protection Bill late Tuesday after a six-hour debate. The bill imposes fines up to ₹250 crore for breaches and creates a new regulatory body. Opposition members walked out before the final vote, citing inadequate safeguards. Privacy advocates called the bill a milestone, while critics flagged exemptions for government agencies.
 
-Politics (longer — 2-3 lines):
-**Parliament passes data protection bill** — The Lok Sabha cleared the Digital Personal Data Protection Bill late Tuesday after a six-hour debate. The bill imposes fines up to ₹250 crore for breaches and creates a new regulatory body. Opposition members walked out before the final vote, citing inadequate safeguards.
+Example bullet — Sports (shorter):
+**India beat Australia by 7 wickets in T20 opener** — Chasing 168, Suryakumar Yadav's unbeaten 75 sealed the win in 17.2 overs at Mumbai's Wankhede Stadium. Bumrah took 3 wickets in the powerplay to set up the chase.
 
-Sports (shorter — 1-2 lines):
-**India beat Australia by 7 wickets in T20 opener** — Chasing 168, Suryakumar Yadav's unbeaten 75 sealed the win in 17.2 overs at Mumbai's Wankhede Stadium.
+Example bullet — Technology (shorter):
+**Reliance launches AI assistant for JioMart** — The retail platform rolled out a Hindi-language shopping bot powered by an in-house LLM, available across 500 cities from today. The launch positions Reliance against Amazon and Flipkart in the AI-commerce race.
 
-Technology (shorter — 1-2 lines):
-**Reliance launches AI assistant for JioMart** — The retail platform rolled out a Hindi-language shopping bot powered by an in-house LLM, available across 500 cities from today.
+REMEMBER: Total output 1000-1400 words. Verify before finishing.
 
 {genre_instructions}
 {state_info}
