@@ -337,13 +337,17 @@ Technology (shorter — 1-2 lines):
 
 def call_gemini(prompt: str) -> str:
     """
-    Call gemini-2.5-flash. Raises 429 on quota error, 500 on other errors.
+    Call gemini-2.5-flash with Google Search grounding.
+    Raises 429 on quota error, 500 on other errors.
     """
     try:
         print("[GEMINI] Calling gemini-2.5-flash...")
         resp = client.models.generate_content(
             model="gemini-2.5-flash",
             contents=prompt,
+            config=types.GenerateContentConfig(
+                tools=[{"google_search": {}}]
+            )
         )
         text = (resp.text or "").strip()
         if not text:
@@ -355,6 +359,7 @@ def call_gemini(prompt: str) -> str:
         raise
     except Exception as e:
         err = str(e)
+        print(f"[GEMINI] ❌ Error: {err}")
         if any(x in err for x in ["RESOURCE_EXHAUSTED", "429", "quota"]):
             raise HTTPException(status_code=429, detail="Quota exhausted. Please try again later.")
         raise HTTPException(status_code=500, detail=f"Model request failed: {e}")
