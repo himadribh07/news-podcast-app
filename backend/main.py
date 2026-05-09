@@ -273,8 +273,9 @@ def build_prompt(genres: List[str], states: List[str]) -> str:
     else:
         state_info = f"PRIORITY: Focus on these states: {', '.join(states)}."
 
+    today = datetime.now().strftime("%A, %d %B %Y")
     return f"""
-You are a professional news editor writing today's daily briefing.
+You are a professional news editor writing today's daily briefing for {today}.
 
 OUTPUT FORMAT — STRICT:
 You MUST output exactly 3 sections separated by "---" on its own line.
@@ -343,9 +344,6 @@ def call_gemini(prompt: str) -> str:
         resp = client.models.generate_content(
             model="gemini-2.5-flash",
             contents=prompt,
-            config=types.GenerateContentConfig(
-                tools=[{"google_search": {}}]
-            )
         )
         text = (resp.text or "").strip()
         if not text:
