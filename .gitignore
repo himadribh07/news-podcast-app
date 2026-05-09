@@ -14,3 +14,5 @@ static/
 transcripts/
 node_modules/
 test_r2.py
+test_main.py
+test_api.py

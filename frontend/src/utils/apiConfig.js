@@ -3,7 +3,7 @@
  * Centralized place to manage API URLs for both local and production environments
  */
 
-const PRODUCTION_API = 'https://news-podcast-app.onrender.com';
+const PRODUCTION_API = 'https://signal-pzf6.onrender.com';
 
 // const LOCAL_API = 'http://localhost:8000';
 

@@ -1,6 +1,7 @@
-import React, { useEffect, useContext, useState } from 'react';
+import React, { useEffect, useContext, useState, useRef } from 'react';
 import { AudioProvider, AudioContext } from './context/AudioContext';
 import API_BASE_URL from './utils/apiConfig';
+import { getFormattedDate } from './utils/timeUtils';
 import './App.css';
 
 import Nav              from './components/Nav';
@@ -11,6 +12,7 @@ import EpisodeList      from './components/EpisodeList';
 import Subscribe        from './components/Subscribe';
 import Footer           from './components/Footer';
 import Archive          from './components/Archive';
+import About            from './components/About';
 
 function AppInner() {
   const {
@@ -19,6 +21,7 @@ function AppInner() {
   } = useContext(AudioContext);
 
   const [view, setView] = useState('home'); // 'home' | 'archive'
+  const hasInitialized = useRef(false);
 
   // Sync view with URL hash
   useEffect(() => {
@@ -43,23 +46,58 @@ function AppInner() {
   }, [view]);
 
   useEffect(() => {
+    if (hasInitialized.current) return;
+    hasInitialized.current = true;
+
     (async () => {
       try {
-        const res = await fetch(`${API_BASE_URL}/generate`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({}),
-        });
-        if (!res.ok) return;
-        const json = await res.json();
+        const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+        const attemptGenerate = async (attempt = 1) => {
+          const res = await fetch(`${API_BASE_URL}/generate`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ date: getFormattedDate() }),
+          });
+          if (res.ok) return await res.json();
+          let body = null;
+          try { body = await res.json(); } catch (e) { body = null; }
+          console.warn('Initial generate failed', res.status, body || await res.text().catch(() => ''));
+          if (body && body.detail && body.detail.includes('RESOURCE_EXHAUSTED') && attempt < 2) {
+            const rd = body?.details?.find(d => d['@type'] && d['@type'].includes('RetryInfo'))?.retryDelay;
+            let ms = 5000;
+            if (rd && typeof rd === 'string') {
+              const m = rd.match(/([0-9.]+)s/);
+              if (m) ms = Math.max(1000, Math.floor(parseFloat(m[1]) * 1000));
+            }
+            await sleep(ms + 200);
+            return attemptGenerate(attempt + 1);
+          }
+          if (body && body.detail && body.detail.includes('RESOURCE_EXHAUSTED')) {
+            // Don't alert on initial preload; just bail quietly
+            return null;
+          }
+          return null;
+        };
+
+        const json = await attemptGenerate();
+        if (!json) return;
 
         setTotalTime(json.totalTime ?? '--:--');
         setHeadline(json.headline ?? '');
         setDescription(json.description ?? '');
+
         const audioUrl = json.audio_url.startsWith('http')
           ? json.audio_url
           : `${API_BASE_URL}${json.audio_url}`;
+
         setAudioSource(audioUrl);
+
+        // Auto-play once src loaded
+        audioRef.current.addEventListener('canplay', () => {
+          audioRef.current.play().catch(err => {
+            console.warn('Autoplay blocked by browser:', err);
+          });
+        }, { once: true });
       } catch (err) {
         console.error(err);
       }
@@ -122,7 +160,8 @@ function AppInner() {
           onPlay={togglePlayPause}
         />
         <EpisodeList onViewAll={() => setView('archive')} />
-        <Subscribe onSelect={(p) => console.log('platform', p)} />
+        <About />
+        {/* <Subscribe onSelect={(p) => console.log('platform', p)} /> */}
       </main>
       <Footer />
     </div>

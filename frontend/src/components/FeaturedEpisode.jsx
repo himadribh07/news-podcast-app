@@ -79,16 +79,35 @@ export default function FeaturedEpisode({
       setIsLoading(true);
       try {
         await audio.runGenerate(async () => {
-          const res = await fetch(`${API_BASE_URL}/generate`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ genres: null, states: null }),
-          });
-          if (!res.ok) {
-            console.error('Generate request failed', await res.text());
+          const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+          const attemptGenerate = async (attempt = 1) => {
+            const res = await fetch(`${API_BASE_URL}/generate`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ genres: null, states: null, date: getFormattedDate() }),
+            });
+            if (res.ok) return await res.json();
+            let body = null;
+            try { body = await res.json(); } catch (e) { body = null; }
+            console.warn('Generate request failed', res.status, body || await res.text().catch(() => ''));
+            if (body && body.detail && body.detail.includes('RESOURCE_EXHAUSTED') && attempt < 2) {
+              const rd = body?.details?.find(d => d['@type'] && d['@type'].includes('RetryInfo'))?.retryDelay;
+              let ms = 5000;
+              if (rd && typeof rd === 'string') {
+                const m = rd.match(/([0-9.]+)s/);
+                if (m) ms = Math.max(1000, Math.floor(parseFloat(m[1]) * 1000));
+              }
+              await sleep(ms + 200);
+              return attemptGenerate(attempt + 1);
+            }
+            if (body && body.detail && body.detail.includes('RESOURCE_EXHAUSTED')) {
+              alert('Service temporarily unavailable: model quota exceeded. Please try again later.');
+            }
             return null;
-          }
-          const json = await res.json();
+          };
+
+          const json = await attemptGenerate();
+          if (!json) return null;
           const audioRes = await fetch(`${API_BASE_URL}${json.audio_url}`);
           if (!audioRes.ok) {
             console.error('Failed to fetch audio', await audioRes.text());

@@ -1,6 +1,7 @@
 import React, { useContext, useState, useMemo } from 'react';
 import { formatEyebrowDate } from '../utils/formatDate';
 import { AudioContext } from '../context/AudioContext';
+import { getFormattedDate } from '../utils/timeUtils';
 import API_BASE_URL from '../utils/apiConfig';
 import { highlightRandomWords } from '../utils/highlightWords';
 import ArrowIcon from './ArrowIcon';
@@ -43,16 +44,47 @@ export default function Hero({
     setIsLoading(true);
     try {
       await audio.runGenerate(async () => {
-        const res = await fetch(`${API_BASE_URL}/generate`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({}),
-        });
-        if (!res.ok) {
-          console.error('Generate failed', await res.text());
+        const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+        const attemptGenerate = async (attempt = 1) => {
+          const res = await fetch(`${API_BASE_URL}/generate`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ date: getFormattedDate() }),
+          });
+          if (res.ok) return await res.json();
+
+          // Try to parse error body for quota/retry info
+          let body = null;
+          try { body = await res.json(); } catch (e) { body = null; }
+
+          const detailMsg = body?.detail || body || (await res.text().catch(() => ''));
+          console.warn('Generate failed', res.status, detailMsg);
+
+          // If quota exhausted, attempt one retry after suggested delay
+          if (body && body.detail && body.detail.includes('RESOURCE_EXHAUSTED') && attempt < 2) {
+            // Try to read retryDelay from details
+            const rd = body?.details?.find(d => d['@type'] && d['@type'].includes('RetryInfo'))?.retryDelay;
+            let ms = 5000;
+            if (rd && typeof rd === 'string') {
+              const m = rd.match(/([0-9.]+)s/);
+              if (m) ms = Math.max(1000, Math.floor(parseFloat(m[1]) * 1000));
+            }
+            await sleep(ms + 200);
+            return attemptGenerate(attempt + 1);
+          }
+
+          // Surface a user-friendly alert for quota errors
+          if (body && body.detail && body.detail.includes('RESOURCE_EXHAUSTED')) {
+            alert('Service temporarily unavailable: model quota exceeded. Please try again later.');
+            return null;
+          }
+
+          // For other errors, return null
           return null;
-        }
-        const json = await res.json();
+        };
+
+        const json = await attemptGenerate();
+        if (!json) return null;
         console.log('API totalTime:', json.totalTime);
 
         audio.setAudioSource(`${API_BASE_URL}${json.audio_url}`);

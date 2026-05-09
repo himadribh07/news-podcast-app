@@ -81,21 +81,54 @@ export const convertToMinFormat = (timeString) => {
  * Fetches from backend API which counts existing episode files
  * @returns {Promise<number>} Episode number (total episodes produced)
  */
+let cachedEpisodeNumber = null;
+let pendingEpisodeRequest = null;
+
+/**
+ * Calculate episode number based on total episodes produced
+ * Uses request deduplication + memory cache
+ * to prevent multiple simultaneous API calls
+ */
 export const getEpisodeNumber = async () => {
-  try {
-    const res = await fetch(`${API_BASE_URL}/episode-count`);
-    if (!res.ok) throw new Error('Failed to fetch episode count');
-    const data = await res.json();
-    return data.totalEpisodes || 1;
-  } catch (err) {
-    console.warn('Could not fetch episode count, defaulting to 1:', err);
-    return 1;
+  // Return cached value immediately
+  if (cachedEpisodeNumber !== null) {
+    return cachedEpisodeNumber;
   }
+
+  // Reuse ongoing request
+  if (pendingEpisodeRequest) {
+    return pendingEpisodeRequest;
+  }
+
+  pendingEpisodeRequest = (async () => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/episode-count`);
+
+      if (!res.ok) {
+        throw new Error('Failed to fetch episode count');
+      }
+
+      const data = await res.json();
+
+      cachedEpisodeNumber = data.totalEpisodes || 1;
+
+      return cachedEpisodeNumber;
+    } catch (err) {
+      console.warn('Could not fetch episode count, defaulting to 1:', err);
+
+      cachedEpisodeNumber = 1;
+
+      return 1;
+    } finally {
+      pendingEpisodeRequest = null;
+    }
+  })();
+
+  return pendingEpisodeRequest;
 };
 
 /**
  * Get episode eyebrow text with dynamic episode number
- * @returns {Promise<string>} Eyebrow text like "◇ Featured · Episode 5"
  */
 export const getEpisodeEyebrow = async () => {
   const episodeNum = await getEpisodeNumber();
