@@ -4,15 +4,15 @@ import API_BASE_URL from './utils/apiConfig';
 import { getFormattedDate } from './utils/timeUtils';
 import './App.css';
 
-import Nav              from './components/Nav';
-import Hero             from './components/Hero';
-import Ticker           from './components/Ticker';
-import FeaturedEpisode  from './components/FeaturedEpisode';
-import EpisodeList      from './components/EpisodeList';
-import Subscribe        from './components/Subscribe';
-import Footer           from './components/Footer';
-import Archive          from './components/Archive';
-import About            from './components/About';
+import Nav              from './components/Navbar/Nav';
+import Hero             from './components/Hero/Hero';
+import Ticker           from './components/Ticker/Ticker';
+import FeaturedEpisode  from './components/FeaturedEpisode/FeaturedEpisode';
+import EpisodeList      from './components/EpisodeList/EpisodeList';
+import Subscribe        from './components/Subscribe/Subscribe';
+import Footer           from './components/Footer/Footer';
+import Archive          from './components/Archive/Archive';
+import About            from './components/About/About';
 
 function AppInner() {
   const {

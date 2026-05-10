@@ -1,15 +1,16 @@
 import React, { useContext, useState, useMemo } from 'react';
-import { formatEyebrowDate } from '../utils/formatDate';
-import { AudioContext } from '../context/AudioContext';
-import { getFormattedDate } from '../utils/timeUtils';
-import API_BASE_URL from '../utils/apiConfig';
-import { highlightRandomWords } from '../utils/highlightWords';
-import ArrowIcon from './ArrowIcon';
+import { formatEyebrowDate } from '../../utils/formatDate';
+import { AudioContext } from '../../context/AudioContext';
+import { getFormattedDate } from '../../utils/timeUtils';
+import API_BASE_URL from '../../utils/apiConfig';
+import { highlightRandomWords } from '../../utils/highlightWords';
+import ArrowIcon from '../ArrowIcon';
+import './Hero.css';
 
 export default function Hero({
   eyebrowDate,
-  totalTime,   
-  playing = false,                 //"MM:SS" from API
+  totalTime,
+  playing = false,
   live = true,
   headline,
   thesisTag = '[thesis]',
@@ -22,7 +23,6 @@ export default function Hero({
   const audio = useContext(AudioContext);
   const [isLoading, setIsLoading] = useState(false);
   const displayEyebrowDate = eyebrowDate ?? formatEyebrowDate();
-  // Precompute highlighted headline to keep hooks stable
   const highlightedHeadline = useMemo(() => {
     return typeof headline === 'string' ? highlightRandomWords(headline, { count: 3 }) : null;
   }, [headline]);
@@ -38,7 +38,6 @@ export default function Hero({
       return;
     }
 
-    // Prevent multiple concurrent generate calls across the app.
     if (audio.isGenerating) return;
 
     setIsLoading(true);
@@ -53,16 +52,13 @@ export default function Hero({
           });
           if (res.ok) return await res.json();
 
-          // Try to parse error body for quota/retry info
           let body = null;
           try { body = await res.json(); } catch (e) { body = null; }
 
           const detailMsg = body?.detail || body || (await res.text().catch(() => ''));
           console.warn('Generate failed', res.status, detailMsg);
 
-          // If quota exhausted, attempt one retry after suggested delay
           if (body && body.detail && body.detail.includes('RESOURCE_EXHAUSTED') && attempt < 2) {
-            // Try to read retryDelay from details
             const rd = body?.details?.find(d => d['@type'] && d['@type'].includes('RetryInfo'))?.retryDelay;
             let ms = 5000;
             if (rd && typeof rd === 'string') {
@@ -73,13 +69,11 @@ export default function Hero({
             return attemptGenerate(attempt + 1);
           }
 
-          // Surface a user-friendly alert for quota errors
           if (body && body.detail && body.detail.includes('RESOURCE_EXHAUSTED')) {
             alert('Service temporarily unavailable: model quota exceeded. Please try again later.');
             return null;
           }
 
-          // For other errors, return null
           return null;
         };
 
@@ -101,7 +95,6 @@ export default function Hero({
     }
   };
 
-  // derive pill duration ("18 min") from totalTime ("18:04")
   const eyebrowDuration = totalTime
     ? `${parseInt(totalTime.split(':')[0], 10)} min`
     : '-- min';
@@ -148,44 +141,6 @@ export default function Hero({
           </button>
         </div>
       </div>
-
-      <style>{`
-        /* same as before — unchanged */
-        .sig-hero { padding: 96px 0 120px; position: relative; }
-        .sig-hero::before {
-          content: ""; position: absolute;
-          top: 10%; right: -10%; width: 520px; height: 520px;
-          background: radial-gradient(circle, oklch(0.78 0.14 65 / 0.08), transparent 60%);
-          pointer-events: none;
-        }
-        .sig-hero__pills { display: flex; gap: 10px; align-items: center; margin-bottom: 40px; flex-wrap: wrap; }
-        .sig-hero__headline {
-          font-family: var(--sans);
-          font-size: clamp(48px, 7.4vw, 104px);
-          line-height: 0.98; letter-spacing: -0.035em;
-          font-weight: 500; margin: 0 0 36px;
-          max-width: 1000px; text-wrap: balance;
-        }
-        .sig-hero__thesis {
-          display: flex; gap: 14px; align-items: baseline;
-          margin-bottom: 20px;
-          font-family: var(--mono); font-size: 12px;
-          color: var(--fg-faint);
-        }
-        .sig-hero__thesis-tag { color: var(--accent); }
-        .sig-hero__sub {
-          max-width: 620px;
-          font-size: 17px; line-height: 1.55;
-          color: var(--fg-dim);
-          margin: 0 0 40px;
-        }
-        .sig-hero__ctas { display: flex; gap: 10px; flex-wrap: wrap; }
-
-        @media (max-width: 900px) {
-          .sig-hero { padding: 56px 0 72px; }
-          .sig-hero__headline { font-size: clamp(40px, 10vw, 64px); }
-        }
-      `}</style>
     </section>
   );
 }
