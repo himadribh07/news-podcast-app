@@ -216,6 +216,11 @@ def parse_episode_response(raw_text: str) -> dict:
         script = re.sub(r"^#+\s*SCRIPT\s*", "", script, flags=re.IGNORECASE).strip()
         script = re.sub(r"^\d+\.\s*", "", script).strip()
 
+        words = script.split()
+        if len(words) > 800:
+            words = words[:800]
+            script = " ".join(words) + "..."
+
     return {"headline": headline, "description": description, "script": script}
 
 
@@ -311,7 +316,9 @@ The full news bullets organized by category.
 This section MUST be 750-900 words on its own.
 
 Per-bullet format:
-- Each bullet starts with a bold headline
+- Each bullet starts with a bold headlinegit add backend/main.py
+git commit -m "Add 800-word limit, enforce 24hr news, fallback for location restrictions"
+git push
 - Followed by an em-dash and explanatory lines beneath it
 - Format: **Headline** — explanation
 
@@ -341,7 +348,7 @@ Example bullet — Sports (shorter):
 Example bullet — Technology (shorter):
 **Reliance launches AI assistant for JioMart** — The retail platform rolled out a Hindi-language shopping bot powered by an in-house LLM, available across 500 cities from today. The launch positions Reliance against Amazon and Flipkart in the AI-commerce race.
 
-REMEMBER: Total output 1000-1400 words. Verify before finishing.
+CRITICAL: Keep script under 800 words. Use ONLY last 24 hours of real news (not training data). Verify all headlines are current and verifiable.
 
 {genre_instructions}
 {state_info}
@@ -375,6 +382,20 @@ def call_gemini(prompt: str) -> str:
         print(f"[GEMINI] ❌ Error: {err}")
         if any(x in err for x in ["RESOURCE_EXHAUSTED", "429", "quota"]):
             raise HTTPException(status_code=429, detail="Quota exhausted. Please try again later.")
+        if "FAILED_PRECONDITION" in err or "location" in err.lower():
+            print("[GEMINI] Location restricted. Retrying without grounding...")
+            try:
+                resp = client.models.generate_content(
+                    model="gemini-2.5-flash",
+                    contents=prompt,
+                )
+                text = (resp.text or "").strip()
+                if not text:
+                    raise HTTPException(status_code=500, detail="Empty response from model")
+                print("[GEMINI] ✅ Success without grounding")
+                return text
+            except Exception as retry_err:
+                raise HTTPException(status_code=500, detail=f"Model request failed: {retry_err}")
         raise HTTPException(status_code=500, detail=f"Model request failed: {e}")
 
 
