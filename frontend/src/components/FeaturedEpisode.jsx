@@ -36,7 +36,6 @@ export default function FeaturedEpisode({
   const [epNumber, setEpNumber] = useState(1);
   const [eyebrow, setEyebrow] = useState('◇ Featured · Episode 1');
 
-  // Fetch episode number from backend on mount
   useEffect(() => {
     (async () => {
       const episodeNum = await getEpisodeNumber();
@@ -44,7 +43,7 @@ export default function FeaturedEpisode({
       setEpNumber(episodeNum);
       setEyebrow(eyebrowText);
     })();
-  }, []);
+  }, [audio.totalTime]);  // re-run when API returns fresh data
 
   const displayReleasedAt = releasedAt ?? formatReleasedAt();
   const displayTotalTime = audio.totalTime ?? '--:--';
@@ -62,9 +61,16 @@ export default function FeaturedEpisode({
     return highlightRandomWords(transcript.script || '', { count: 8 });
   }, [transcript]);
 
-  const highlightedTitle = useMemo(() => {
-    return typeof title === 'string' ? highlightRandomWords(title, { count: 3 }) : null;
+  const trimmedTitle = useMemo(() => {
+    if (typeof title !== 'string') return title;
+    // Take everything up to and including first full stop
+    const idx = title.indexOf('.');
+    return idx === -1 ? title : title.slice(0, idx + 1);
   }, [title]);
+
+  const highlightedTitle = useMemo(() => {
+    return typeof trimmedTitle === 'string' ? highlightRandomWords(trimmedTitle, { count: 3 }) : null;
+  }, [trimmedTitle]);
 
   const handlePlayClick = async () => {
     if (audio.playing) {

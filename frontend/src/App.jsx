@@ -18,6 +18,7 @@ function AppInner() {
   const {
     playing, totalTime, headline, description,
     setTotalTime, setHeadline, setDescription, setAudioSource, togglePlayPause,
+    audioRef,
   } = useContext(AudioContext);
 
   const [view, setView] = useState('home'); // 'home' | 'archive'
@@ -93,11 +94,13 @@ function AppInner() {
         setAudioSource(audioUrl);
 
         // Auto-play once src loaded
-        audioRef.current.addEventListener('canplay', () => {
+        const onCanPlay = () => {
           audioRef.current.play().catch(err => {
-            console.warn('Autoplay blocked by browser:', err);
+            console.warn('Autoplay blocked by browser. Click play to start.', err);
           });
-        }, { once: true });
+          audioRef.current.removeEventListener('canplay', onCanPlay);
+        };
+        audioRef.current.addEventListener('canplay', onCanPlay);
       } catch (err) {
         console.error(err);
       }

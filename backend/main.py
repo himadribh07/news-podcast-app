@@ -15,6 +15,7 @@ from pydantic import BaseModel
 from typing import List, Optional
 from mutagen.mp3 import MP3
 import boto3
+from config import ALL_GENRES, GENRE_BLOCKS, build_prompt
 
 load_dotenv()
 
@@ -64,61 +65,6 @@ os.makedirs(TRANSCRIPTS_DIR, exist_ok=True)
 app.mount("/static", StaticFiles(directory=OUTPUT_DIR), name="static")
 
 
-ALL_GENRES = [
-    "Front Page / Breaking News",
-    "International News",
-    "Politics",
-    "Finance",
-    "Sports",
-    "Entertainment",
-    "Technology",
-    "Health",
-]
-
-GENRE_BLOCKS = {
-    "Front Page / Breaking News": """
-    ## Front Page / Breaking News (India-focused)
-    - Include the most important national or global breaking stories from the last 24 hours
-    - Government decisions, emergencies, major incidents
-    """,
-    "International News": """
-    ## International News
-    - Major global events, geopolitics, conflicts, diplomacy
-    - Focus on stories with India relevance when possible
-    """,
-    "Politics": """
-    ## Politics
-    - Indian politics only
-    - Government decisions, elections, policy changes, parliament updates
-    """,
-    "Finance": """
-    ## Finance
-    - Indian markets, RBI updates, inflation, startups, major corporate news
-    """,
-    "Sports": """
-    ## Sports
-    - Cricket (India priority)
-    - Football (major leagues only)
-    - Any major international sports events
-    """,
-    "Entertainment": """
-    ## Entertainment
-    - Bollywood first
-    - Major Hollywood or global entertainment news
-    """,
-    "Technology": """
-    ## Technology
-    - Indian tech startups and companies
-    - Major tech announcements, AI, cyber security
-    - Innovation and digital transformation
-    """,
-    "Health": """
-    ## Health
-    - Health policy updates, disease prevention
-    - Medical breakthroughs and research
-    - Public health alerts and wellness news
-    """,
-}
 
 
 class GenerateRequest(BaseModel):
@@ -269,90 +215,6 @@ def cleanup_old_episodes():
         print(f"[CLEANUP] Done. Deleted {deleted_count} old episode(s).\n")
     except Exception as e:
         print(f"[CLEANUP] Error: {e}")
-
-
-def build_prompt(genres: List[str], states: List[str]) -> str:
-    genre_instructions = "".join(GENRE_BLOCKS[g] for g in genres if g in GENRE_BLOCKS)
-    if "All States" in states or not states:
-        state_info = "Include news from across all Indian states and union territories."
-    else:
-        state_info = f"PRIORITY: Focus on these states: {', '.join(states)}."
-
-    today = datetime.now().strftime("%A, %d %B %Y")
-    return f"""
-You are a professional news editor writing today's daily briefing for {today}.
-
-OUTPUT FORMAT — STRICT:
-You MUST output exactly 3 sections separated by "---" on its own line.
-Do NOT include section labels like "HEADLINE:" or "1." — just the content.
-Do NOT use markdown bold/italic in headline or description.
-
-LENGTH REQUIREMENT — CRITICAL (MUST FOLLOW):
-The TOTAL output across all 3 sections MUST be between 1000 and 1400 words.
-This produces 6-9 minutes of audio narration when read aloud.
-If your output is under 1000 words, you have failed the task.
-Count your words before finishing. Pack with real news, not filler.
-
-SECTION 1 — HEADLINE
-A single sentence summarizing today's biggest stories.
-MUST be 15-22 words.
-MUST be a complete, grammatical sentence ending with a period.
-Editorial tone. Specific. Not generic.
-Example: "Markets brace for the Reserve Bank's rate decision while a major AI bill clears committee and census numbers reshape three districts."
-
----
-
-SECTION 2 — DESCRIPTION
-A 3-4 line paragraph describing what today's episode covers.
-MUST be 50-80 words total.
-Mention 2-3 specific stories from the script below.
-Do NOT mention any host name. Do NOT use first person.
-Example: "Today's briefing opens with the latest from the Reserve Bank, then turns to the unfolding policy debate in Parliament. We cover three corporate moves shaping Indian markets, the cricket result that mattered, and a tech announcement with global reach. Eight stories. Plain language. Under twenty minutes."
-
----
-
-SECTION 3 — SCRIPT
-The full news bullets organized by category.
-This section MUST be 750-900 words on its own.
-
-Per-bullet format:
-- Each bullet starts with a bold headlinegit add backend/main.py
-git commit -m "Add 800-word limit, enforce 24hr news, fallback for location restrictions"
-git push
-- Followed by an em-dash and explanatory lines beneath it
-- Format: **Headline** — explanation
-
-QUANTITY RULES (STRICT):
-- MINIMUM 18 distinct news bullets across all categories
-- 2-3 bullets per category MINIMUM
-- Each category MUST have content (don't skip any)
-- No filler, no padding — every bullet must be a real distinct story from last 24 hours
-
-Length rules per category:
-- Sports, Technology, Entertainment: headline + 2 lines (35-50 words explanation)
-- All other categories (Front Page, International, Politics, Finance, Health): headline + 3-4 lines (55-80 words explanation)
-
-General rules (STRICT):
-- Bullet points only
-- No opinions, no speculation, no repetition
-- Clean, neutral tone for audio narration
-- Last 24 hours only
-- Group bullets under their category heading (e.g. "## Politics")
-
-Example bullet — Politics (longer):
-**Parliament passes data protection bill** — The Lok Sabha cleared the Digital Personal Data Protection Bill late Tuesday after a six-hour debate. The bill imposes fines up to ₹250 crore for breaches and creates a new regulatory body. Opposition members walked out before the final vote, citing inadequate safeguards. Privacy advocates called the bill a milestone, while critics flagged exemptions for government agencies.
-
-Example bullet — Sports (shorter):
-**India beat Australia by 7 wickets in T20 opener** — Chasing 168, Suryakumar Yadav's unbeaten 75 sealed the win in 17.2 overs at Mumbai's Wankhede Stadium. Bumrah took 3 wickets in the powerplay to set up the chase.
-
-Example bullet — Technology (shorter):
-**Reliance launches AI assistant for JioMart** — The retail platform rolled out a Hindi-language shopping bot powered by an in-house LLM, available across 500 cities from today. The launch positions Reliance against Amazon and Flipkart in the AI-commerce race.
-
-CRITICAL: Keep script under 800 words. Use ONLY last 24 hours of real news (not training data). Verify all headlines are current and verifiable.
-
-{genre_instructions}
-{state_info}
-"""
 
 
 def call_gemini(prompt: str) -> str:
@@ -547,7 +409,6 @@ async def get_episodes():
     try:
         resp = r2_client.list_objects_v2(Bucket=R2_BUCKET, Prefix="transcripts/")
         contents = resp.get("Contents", [])
-        print(f"[/episodes] Found {len(contents)} objects in R2 transcripts/")
 
         episodes = []
         for obj in contents:
@@ -558,21 +419,27 @@ async def get_episodes():
                 transcript_resp = r2_client.get_object(Bucket=R2_BUCKET, Key=key)
                 transcript_data = json.loads(transcript_resp["Body"].read().decode("utf-8"))
                 date_str = key.replace("transcripts/", "").replace("_file.json", "")
-                episode = {
+                episodes.append({
                     "date_str": date_str,
-                    "num": len(episodes) + 1,
+                    "num": 0,  # set later
                     "headline": transcript_data.get("headline", ""),
                     "description": transcript_data.get("description", ""),
                     "audio_url": f"{R2_PUBLIC_URL}/episodes/{date_str}_audio.mp3",
                     "totalTime": transcript_data.get("totalTime", "--:--"),
                     "created_at": transcript_data.get("date", ""),
-                }
-                episodes.append(episode)
+                })
             except Exception as e:
                 print(f"[/episodes] Error parsing {key}: {e}")
                 continue
 
-        episodes.sort(key=lambda ep: ep["created_at"])
+        # Sort chronologically by parsing date_str (more reliable than created_at)
+        def date_key(ep):
+            parsed = parse_date_str(ep["date_str"])
+            return parsed or datetime(1970, 1, 1)
+
+        episodes.sort(key=date_key)
+
+        # Number sequentially after sort
         for i, ep in enumerate(episodes):
             ep["num"] = i + 1
 

@@ -22,7 +22,7 @@ export default function About() {
                 <p>
                   Signal picks the stories that{' '}
                   <span className="sig-it">matter</span>, explains them in
-                  plain language, and ends in under ten minutes.
+                  plain language, and ends in under seven minutes.
                 </p>
 
                 <p className="sig-about__tagline">
@@ -66,7 +66,7 @@ export default function About() {
 
                 <p>
                   One host. Plain language. Every story that mattered, under
-                  ten minutes.
+                  seven minutes.
                 </p>
               </div>
             </div>
@@ -76,7 +76,7 @@ export default function About() {
         <div className="sig-about__stats">
           <div className="sig-about__stat">
             <div className="sig-about__stat-num">
-              ~10<span>min</span>
+              ~7<span>min</span>
             </div>
 
             <div className="sig-about__stat-label">Avg length</div>

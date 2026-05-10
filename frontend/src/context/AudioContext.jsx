@@ -33,7 +33,6 @@ export function AudioProvider({ children }) {
     if (!audioRef.current) {
       audioRef.current = new Audio();
 
-      // Add event listeners
       audioRef.current.addEventListener('timeupdate', () => {
         setCurrentTime(audioRef.current.currentTime);
       });
@@ -43,6 +42,15 @@ export function AudioProvider({ children }) {
       });
 
       audioRef.current.addEventListener('ended', () => {
+        setPlaying(false);
+      });
+
+      // NEW: sync state with native play/pause events
+      audioRef.current.addEventListener('play', () => {
+        setPlaying(true);
+      });
+
+      audioRef.current.addEventListener('pause', () => {
         setPlaying(false);
       });
     }
